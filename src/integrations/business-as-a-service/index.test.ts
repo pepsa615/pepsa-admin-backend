@@ -63,4 +63,54 @@ describe('BAS adapter resilience', () => {
     expect(headers.authorization).not.toBe(firstHeaders.authorization);
     expect(headers['idempotency-key']).toBe('key');
   });
+
+  it('coalesces and briefly caches concurrent capability requests', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ data: { version: '1', operations: [] } }), { status: 200 }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = new BusinessAsAServiceAdapter(
+      'https://bas.example',
+      1000,
+      'bas-audience',
+      'signing-secret-long-enough',
+    );
+
+    const [first, second] = await Promise.all([
+      adapter.capabilities('platform-id'),
+      adapter.capabilities('platform-id'),
+    ]);
+    const cached = await adapter.capabilities('platform-id');
+
+    expect(first).toEqual(second);
+    expect(cached).toEqual(first);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a transient platform rate limit', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('Too Many Requests', {
+          status: 429,
+          headers: { 'retry-after': '0' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: { version: '1', operations: [] } }), { status: 200 }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const adapter = new BusinessAsAServiceAdapter(
+      'https://bas.example',
+      1000,
+      'bas-audience',
+      'signing-secret-long-enough',
+      1,
+    );
+
+    await expect(adapter.capabilities('platform-id')).resolves.toMatchObject({ version: '1' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });
