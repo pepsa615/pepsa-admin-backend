@@ -57,6 +57,10 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env) {
       ttlMs: parsed.SESSION_TTL_MINUTES * 60_000,
       idleMs: parsed.SESSION_IDLE_MINUTES * 60_000,
       secure: parsed.NODE_ENV === 'production',
+      // The production UI and API are deployed on separate Render subdomains.
+      // onrender.com is a public suffix, so those origins are cross-site and
+      // require SameSite=None for credentialed requests.
+      sameSite: parsed.NODE_ENV === 'production' ? ('none' as const) : ('strict' as const),
     },
     mfaEncryptionKey: Buffer.from(parsed.MFA_ENCRYPTION_KEY, 'hex'),
     actorSigningSecret: parsed.ACTOR_SIGNING_SECRET,

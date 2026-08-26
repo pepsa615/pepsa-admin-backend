@@ -29,7 +29,13 @@ export class SessionController {
       reason: revokeSchema.parse(request.body).reason,
       requestId: response.locals.requestId,
     });
-    if (current) response.clearCookie(this.config.session.cookieName, { path: '/admin-api/v1' });
+    if (current)
+      response.clearCookie(this.config.session.cookieName, {
+        httpOnly: true,
+        secure: this.config.session.secure,
+        sameSite: this.config.session.sameSite,
+        path: '/admin-api/v1',
+      });
     response.status(204).end();
   };
 }

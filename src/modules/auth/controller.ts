@@ -37,7 +37,7 @@ export class AuthController {
     response.cookie(this.config.session.cookieName, token, {
       httpOnly: true,
       secure: this.config.session.secure,
-      sameSite: 'strict',
+      sameSite: this.config.session.sameSite,
       path: '/admin-api/v1',
       maxAge: this.config.session.ttlMs,
     });
@@ -112,7 +112,12 @@ export class AuthController {
       request.admin!.id,
       response.locals.requestId,
     );
-    response.clearCookie(this.config.session.cookieName, { path: '/admin-api/v1' });
+    response.clearCookie(this.config.session.cookieName, {
+      httpOnly: true,
+      secure: this.config.session.secure,
+      sameSite: this.config.session.sameSite,
+      path: '/admin-api/v1',
+    });
     response.status(204).end();
   };
 }
