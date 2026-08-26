@@ -61,6 +61,9 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env) {
       // onrender.com is a public suffix, so those origins are cross-site and
       // require SameSite=None for credentialed requests.
       sameSite: parsed.NODE_ENV === 'production' ? ('none' as const) : ('strict' as const),
+      // Partition the cross-site cookie by the top-level admin site so browsers
+      // that block third-party cookies can still complete the MFA flow.
+      partitioned: parsed.NODE_ENV === 'production',
     },
     mfaEncryptionKey: Buffer.from(parsed.MFA_ENCRYPTION_KEY, 'hex'),
     actorSigningSecret: parsed.ACTOR_SIGNING_SECRET,

@@ -34,6 +34,7 @@ export class SessionController {
         httpOnly: true,
         secure: this.config.session.secure,
         sameSite: this.config.session.sameSite,
+        partitioned: this.config.session.partitioned,
         path: '/admin-api/v1',
       });
     response.status(204).end();

@@ -38,6 +38,7 @@ export class AuthController {
       httpOnly: true,
       secure: this.config.session.secure,
       sameSite: this.config.session.sameSite,
+      partitioned: this.config.session.partitioned,
       path: '/admin-api/v1',
       maxAge: this.config.session.ttlMs,
     });
@@ -116,6 +117,7 @@ export class AuthController {
       httpOnly: true,
       secure: this.config.session.secure,
       sameSite: this.config.session.sameSite,
+      partitioned: this.config.session.partitioned,
       path: '/admin-api/v1',
     });
     response.status(204).end();

@@ -6,6 +6,7 @@ describe('session cookie configuration', () => {
     expect(loadConfig({ NODE_ENV: 'test' }).session).toMatchObject({
       secure: false,
       sameSite: 'strict',
+      partitioned: false,
     });
   });
 
@@ -22,6 +23,10 @@ describe('session cookie configuration', () => {
       SECURITY_MONITORING_TOKEN: 't'.repeat(24),
     });
 
-    expect(config.session).toMatchObject({ secure: true, sameSite: 'none' });
+    expect(config.session).toMatchObject({
+      secure: true,
+      sameSite: 'none',
+      partitioned: true,
+    });
   });
 });
