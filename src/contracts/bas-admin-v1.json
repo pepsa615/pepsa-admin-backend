@@ -1,0 +1,56 @@
+{
+  "openapi": "3.1.0",
+  "info": { "title": "Pepsa BAS Internal Admin API", "version": "1.2.0" },
+  "servers": [{ "url": "/internal/admin/v1" }],
+  "security": [{ "actorToken": [] }],
+  "paths": {
+    "/health": { "get": { "responses": { "200": { "description": "Service health" } } } },
+    "/capabilities": {
+      "get": { "responses": { "200": { "description": "Versioned capabilities" } } }
+    },
+    "/operations/overview": {
+      "get": { "responses": { "200": { "description": "BAS overview" } } }
+    },
+    "/operations/businesses": {
+      "get": { "responses": { "200": { "description": "Businesses" } } }
+    },
+    "/operations/business-document": {
+      "get": {
+        "responses": { "200": { "description": "Audited encrypted KYC document retrieval" } }
+      }
+    },
+    "/operations/orders": { "get": { "responses": { "200": { "description": "Orders" } } } },
+    "/operations/finance": { "get": { "responses": { "200": { "description": "Wallets" } } } },
+    "/operations/pricing": {
+      "get": { "responses": { "200": { "description": "Pricing versions" } } }
+    },
+    "/operations/transactions": {
+      "get": { "responses": { "200": { "description": "Transactions" } } }
+    },
+    "/operations/invoices": { "get": { "responses": { "200": { "description": "Invoices" } } } },
+    "/operations/api-keys": {
+      "get": { "responses": { "200": { "description": "Redacted API-key metadata" } } }
+    },
+    "/operations/webhooks": {
+      "get": { "responses": { "200": { "description": "Redacted webhook deliveries" } } }
+    },
+    "/operations/audit": { "get": { "responses": { "200": { "description": "Platform audit" } } } },
+    "/operations/businesses-review": {
+      "post": { "responses": { "200": { "description": "Idempotent business review" } } }
+    },
+    "/operations/businesses-bulk-review-preview": {
+      "post": { "responses": { "200": { "description": "Validated bulk preview" } } }
+    },
+    "/operations/businesses-bulk-review": {
+      "post": { "responses": { "202": { "description": "Idempotent bulk business review" } } }
+    },
+    "/operations/webhooks-replay": {
+      "post": { "responses": { "202": { "description": "Idempotent webhook replay" } } }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "actorToken": { "type": "http", "scheme": "bearer", "bearerFormat": "short-lived signed JWT" }
+    }
+  }
+}

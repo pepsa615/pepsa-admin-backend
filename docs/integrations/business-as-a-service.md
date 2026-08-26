@@ -1,0 +1,13 @@
+# Business as a Service integration
+
+The control plane and BAS are independently built and deployed. They share no runtime package or database access; all administration crosses `/internal/admin/v1` with a pinned contract.
+
+Actor tokens are HS256 signed, audience/issuer constrained, valid for 60 seconds, and single-use through a durable BAS nonce table. They contain one platform, one environment, the single permission required by the selected capability, the correlated request ID, and any permission-specific resource scopes.
+
+Credential rotation uses `POST /admin-api/v1/platforms/{id}/credentials/rotate`. It requires recent MFA and a separately approved `platform.credentials.rotate` request whose payload exactly matches the new secret-manager reference. The API never accepts or returns raw credentials.
+
+The adapter calls only `/internal/admin/v1`. Requests contain a 60-second HS256 actor token with issuer, audience, actor, platform, permission, request ID, issued time, and expiry. BAS verifies the token and required permission again.
+
+Read operations: `overview`, `businesses`, audited `business-document`, `orders`, `finance`, `pricing`, `transactions`, `invoices`, `api-keys`, `webhooks`, and `audit`. Approved mutations are `businesses-review`, previewed `businesses-bulk-review`, and `webhooks-replay`; they require a reason and idempotency key, run through the durable operation worker, and create correlated audit events in both systems. Bulk review is capped at 50 records, validates every lifecycle transition before changing any record, and returns explicit compensation guidance. KYC bytes remain encrypted at rest and are decrypted only for a scoped, audited document-view request. Secret hashes, encrypted webhook secrets, and complete tokens are never returned.
+
+Timeouts are bounded by `PLATFORM_REQUEST_TIMEOUT_MS`. Safe/idempotent requests retry with bounded backoff and the circuit breaker isolates an unavailable BAS service. Rotate the shared signing credential by accepting old and new keys at BAS, deploying the admin signer, confirming traffic, and then removing the old key. Never log actor tokens or customer payloads.

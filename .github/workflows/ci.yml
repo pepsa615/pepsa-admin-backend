@@ -1,0 +1,38 @@
+name: Admin backend CI
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pepsa_admin_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pepsa_admin_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pepsa_admin_test?schema=public
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pepsa_admin_test?schema=public
+      BOOTSTRAP_ADMIN_EMAIL: ci-admin@example.com
+      BOOTSTRAP_ADMIN_PASSWORD: CI-Only-Bootstrap-Password-2026!
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 11.18.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22.14, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm prisma:migrate
+      - run: pnpm prisma:seed
+      - run: pnpm verify
+      - run: pnpm format:check
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pepsa-admin-openapi-1.2.0
+          path: src/contracts/releases/admin-api-v1.2.0.yaml

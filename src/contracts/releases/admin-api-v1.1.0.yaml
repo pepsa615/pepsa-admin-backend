@@ -1,0 +1,308 @@
+openapi: 3.1.0
+info:
+  title: Pepsa Admin Control Plane API
+  version: 1.1.0
+servers:
+  - url: /admin-api/v1
+paths:
+  /health/live:
+    get:
+      security: []
+      responses: { '200': { description: Live } }
+  /auth/login:
+    post:
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                {
+                  email: { type: string, format: email },
+                  password: { type: string, minLength: 12 },
+                }
+      responses:
+        { '202': { description: MFA required }, '401': { $ref: '#/components/responses/Error' } }
+  /auth/password-recovery:
+    post:
+      security: []
+      responses: { '202': { description: Recovery delivery accepted } }
+  /auth/password-reset:
+    post:
+      security: []
+      responses:
+        {
+          '204': { description: Password reset and sessions revoked },
+          '401': { $ref: '#/components/responses/Error' },
+        }
+  /auth/mfa/verify:
+    post:
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              {
+                schema:
+                  {
+                    type: object,
+                    required: [code],
+                    properties: { code: { type: string, pattern: '^\\d{6}$' } },
+                  },
+              },
+          }
+      responses:
+        { '200': { description: Authenticated }, '401': { $ref: '#/components/responses/Error' } }
+  /auth/mfa/recover:
+    post:
+      description: Consume one single-use MFA recovery code after password verification.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  pattern: '^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$'
+      responses:
+        { '200': { description: Authenticated }, '401': { $ref: '#/components/responses/Error' } }
+  /auth/session:
+    get:
+      {
+        responses:
+          {
+            '200': { description: Current session },
+            '401': { $ref: '#/components/responses/Error' },
+          },
+      }
+  /auth/csrf:
+    get: { responses: { '200': { description: Rotated CSRF token } } }
+  /auth/step-up:
+    post:
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      responses:
+        {
+          '204': { description: Recent MFA established },
+          '401': { $ref: '#/components/responses/Error' },
+        }
+  /auth/logout:
+    post:
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      responses: { '204': { description: Session revoked } }
+  /platforms:
+    get:
+      {
+        responses:
+          {
+            '200': { description: Assigned platforms },
+            '401': { $ref: '#/components/responses/Error' },
+          },
+      }
+    post:
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      responses:
+        {
+          '201': { description: Platform registered },
+          '403': { $ref: '#/components/responses/Error' },
+        }
+  /platforms/{id}:
+    patch:
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/Csrf' }
+      responses: { '200': { description: Platform updated } }
+  /platforms/{id}/environments:
+    post:
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/Csrf' }
+      responses: { '201': { description: Platform environment created } }
+  /platforms/{platformKey}/health:
+    get:
+      parameters: [{ name: platformKey, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: Destination health } }
+  /administrators:
+    get:
+      {
+        responses:
+          {
+            '200': { description: Administrator directory },
+            '403': { $ref: '#/components/responses/Error' },
+          },
+      }
+    post:
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      responses:
+        {
+          '201': { description: Administrator invited },
+          '403': { $ref: '#/components/responses/Error' },
+        }
+  /roles:
+    get: { responses: { '200': { description: Role and permission catalogue } } }
+    post:
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      responses: { '201': { description: Custom role created } }
+  /permissions:
+    get: { responses: { '200': { description: Permission catalogue } } }
+  /administrators/{userId}/status:
+    patch:
+      parameters:
+        - { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/Csrf' }
+      responses: { '204': { description: Account status updated } }
+  /administrators/{userId}/membership:
+    put:
+      parameters:
+        - { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/Csrf' }
+      responses: { '200': { description: Platform membership updated } }
+  /administrators/{userId}/assignments:
+    post:
+      parameters:
+        - { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/Csrf' }
+      responses: { '201': { description: Scoped role assigned } }
+  /assignments/{assignmentId}/revoke:
+    post:
+      parameters:
+        - { name: assignmentId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/Csrf' }
+      responses: { '200': { description: Assignment revoked } }
+  /audit:
+    get:
+      {
+        responses:
+          {
+            '200': { description: Cursor-paginated audit events },
+            '403': { $ref: '#/components/responses/Error' },
+          },
+      }
+  /audit/export:
+    get: { responses: { '200': { description: CSV compliance export } } }
+  /audit/verify:
+    get: { responses: { '200': { description: Hash-chain integrity result } } }
+  /operations:
+    get: { responses: { '200': { description: Operation history } } }
+  /operations/{platformKey}/{operation}:
+    parameters:
+      - { name: platformKey, in: path, required: true, schema: { type: string } }
+      - { name: operation, in: path, required: true, schema: { type: string } }
+    get:
+      {
+        responses:
+          {
+            '200': { description: Platform operation result },
+            '403': { $ref: '#/components/responses/Error' },
+          },
+      }
+    post:
+      parameters:
+        - { $ref: '#/components/parameters/Csrf' }
+        - {
+            name: Idempotency-Key,
+            in: header,
+            required: true,
+            schema: { type: string, format: uuid },
+          }
+      responses:
+        {
+          '202': { description: Platform mutation accepted },
+          '403': { $ref: '#/components/responses/Error' },
+        }
+  /operations/records/{id}:
+    get:
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Async operation status } }
+  /approvals:
+    get: { responses: { '200': { description: Approval requests } } }
+    post:
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      responses: { '201': { description: Approval requested } }
+  /approvals/{id}/decision:
+    post:
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/Csrf' }
+      responses: { '200': { description: Independent decision recorded } }
+  /approvals/{id}/cancel:
+    post:
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/Csrf' }
+      responses: { '204': { description: Approval cancelled } }
+  /access-reviews:
+    get: { responses: { '200': { description: Access review campaigns } } }
+    post:
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      responses: { '201': { description: Access review campaign created } }
+  /access-reviews/{reviewId}/items/{itemId}/decision:
+    post:
+      parameters:
+        - { name: reviewId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: itemId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/Csrf' }
+      responses: { '200': { description: Review item decided } }
+  /emergency-access:
+    get: { responses: { '200': { description: Emergency access grants } } }
+    post:
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      responses: { '201': { description: Emergency access requested } }
+  /emergency-access/{id}/decision:
+    post:
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/Csrf' }
+      responses: { '200': { description: Emergency request decided } }
+  /emergency-access/{id}/revoke:
+    post:
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/Csrf' }
+      responses: { '204': { description: Emergency access revoked } }
+  /notifications:
+    get: { responses: { '200': { description: Current administrator notifications } } }
+  /notifications/{id}/read:
+    post:
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/Csrf' }
+      responses: { '204': { description: Notification marked read } }
+  /notifications/read-all:
+    post:
+      parameters: [{ $ref: '#/components/parameters/Csrf' }]
+      responses: { '204': { description: Notifications marked read } }
+  /sessions:
+    get: { responses: { '200': { description: Active administrator sessions } } }
+  /sessions/{id}/revoke:
+    post:
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/Csrf' }
+      responses: { '204': { description: Session revoked } }
+components:
+  securitySchemes:
+    sessionCookie: { type: apiKey, in: cookie, name: pepsa_admin_session }
+  parameters:
+    Csrf: { name: X-CSRF-Token, in: header, required: true, schema: { type: string } }
+  responses:
+    Error:
+      description: Normalized error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                required: [code, message, requestId]
+                properties:
+                  { code: { type: string }, message: { type: string }, requestId: { type: string } }
+security:
+  - sessionCookie: []
+

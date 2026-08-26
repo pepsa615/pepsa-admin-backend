@@ -1,0 +1,433 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AdminStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+enum MfaStatus {
+  PENDING
+  ENABLED
+}
+enum PlatformStatus {
+  ACTIVE
+  DEGRADED
+  DISABLED
+}
+enum MembershipStatus {
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+enum RoleStatus {
+  ACTIVE
+  DISABLED
+}
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+enum OperationStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+enum AuditOutcome {
+  SUCCESS
+  DENIED
+  FAILURE
+}
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+enum ApprovalDecisionType {
+  APPROVE
+  REJECT
+}
+enum AccessReviewStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+enum AccessReviewDecision {
+  KEEP
+  REVOKE
+}
+enum NotificationStatus {
+  UNREAD
+  READ
+}
+enum EmergencyAccessStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  REVOKED
+  REJECTED
+}
+
+model AdminUser {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  name            String
+  passwordHash    String
+  status          AdminStatus @default(INVITED)
+  mfaStatus       MfaStatus @default(PENDING)
+  mfaSecret       String?
+  failedLogins    Int      @default(0)
+  lockedUntil     DateTime?
+  lastLoginAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  sessions        AdminSession[]
+  recoveryCodes   AdminRecoveryCode[]
+  passwordResets  PasswordResetToken[]
+  memberships     PlatformMembership[]
+  assignments     RoleAssignment[] @relation("Assignee")
+  grants          RoleAssignment[] @relation("Grantor")
+  auditEvents     AuditEvent[] @relation("AuditActor")
+  operations      AdminOperation[]
+  approvalRequests ApprovalRequest[] @relation("ApprovalRequester")
+  approvalDecisions ApprovalDecision[] @relation("ApprovalDecider")
+  reviewCampaigns AccessReview[] @relation("AccessReviewer")
+  reviewItems AccessReviewItem[] @relation("ReviewedAdmin")
+  notifications Notification[]
+  emergencyGrants EmergencyAccessGrant[] @relation("EmergencyRecipient")
+  emergencyRequests EmergencyAccessGrant[] @relation("EmergencyRequester")
+  emergencyApprovals EmergencyAccessGrant[] @relation("EmergencyApprover")
+}
+
+model PasswordResetToken {
+  id          String   @id @default(uuid())
+  adminUserId String
+  tokenHash   String   @unique
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime @default(now())
+  user        AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  @@index([adminUserId, expiresAt])
+}
+
+model RateLimitBucket {
+  key       String   @id
+  count     Int      @default(0)
+  resetAt   DateTime
+  updatedAt DateTime @updatedAt
+  @@index([resetAt])
+}
+
+model AdminRecoveryCode {
+  id        String @id @default(uuid())
+  adminUserId String
+  codeHash  String @unique
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  @@index([adminUserId, usedAt])
+}
+
+model AdminSession {
+  id            String   @id @default(uuid())
+  adminUserId   String
+  tokenHash     String   @unique
+  csrfHash      String
+  mfaVerifiedAt DateTime?
+  stepUpAt      DateTime?
+  ipHash        String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+  lastSeenAt    DateTime @default(now())
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  user          AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  @@index([adminUserId, expiresAt])
+}
+
+model Platform {
+  id                     String   @id @default(uuid())
+  key                    String   @unique
+  name                   String
+  description            String?
+  status                 PlatformStatus @default(ACTIVE)
+  adapterType            String
+  configurationReference String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  environments           PlatformEnvironment[]
+  memberships            PlatformMembership[]
+  roles                  Role[]
+  permissions            Permission[]
+  assignments            RoleAssignment[]
+  auditEvents            AuditEvent[]
+  operations             AdminOperation[]
+  approvals              ApprovalRequest[]
+  accessReviews          AccessReview[]
+  emergencyGrants        EmergencyAccessGrant[]
+}
+
+model PlatformEnvironment {
+  id        String   @id @default(uuid())
+  platformId String
+  key       String
+  name      String
+  status    PlatformStatus @default(ACTIVE)
+  endpointReference String?
+  platform  Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  assignments RoleAssignment[]
+  @@unique([platformId, key])
+}
+
+model PlatformMembership {
+  id          String @id @default(uuid())
+  adminUserId String
+  platformId  String
+  status      MembershipStatus @default(ACTIVE)
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  platform    Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  @@unique([adminUserId, platformId])
+  @@index([platformId, status])
+}
+
+model Role {
+  id           String @id @default(uuid())
+  platformId   String?
+  scope        String
+  key          String
+  name         String
+  description  String?
+  isSystemRole Boolean @default(false)
+  status       RoleStatus @default(ACTIVE)
+  platform     Platform? @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  permissions  RolePermission[]
+  assignments  RoleAssignment[]
+  @@unique([scope, key])
+}
+
+model Permission {
+  id          String @id @default(uuid())
+  platformId  String?
+  scope       String
+  key         String
+  description String?
+  riskLevel   RiskLevel @default(LOW)
+  delegatable Boolean @default(false)
+  platform    Platform? @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  roles       RolePermission[]
+  @@unique([scope, key])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  @@id([roleId, permissionId])
+}
+
+model RoleAssignment {
+  id            String @id @default(uuid())
+  adminUserId   String
+  roleId        String
+  platformId    String?
+  environmentId String?
+  resourceScope Json?
+  grantedBy     String
+  grantedAt     DateTime @default(now())
+  expiresAt     DateTime?
+  revokedAt     DateTime?
+  revokeReason  String?
+  user          AdminUser @relation("Assignee", fields: [adminUserId], references: [id], onDelete: Cascade)
+  role          Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  platform      Platform? @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  environment   PlatformEnvironment? @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  grantor       AdminUser @relation("Grantor", fields: [grantedBy], references: [id])
+  reviewItems   AccessReviewItem[]
+  @@index([adminUserId, platformId, revokedAt])
+}
+
+model AuditEvent {
+  id            String @id @default(uuid())
+  sequence      BigInt @unique @default(autoincrement())
+  actorId       String?
+  platformId    String?
+  action        String
+  targetType    String?
+  targetId      String?
+  outcome       AuditOutcome
+  reason        String?
+  requestId     String
+  ipHash        String?
+  metadata      Json?
+  previousHash  String?
+  integrityHash String
+  createdAt     DateTime @default(now())
+  actor         AdminUser? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  platform      Platform? @relation(fields: [platformId], references: [id], onDelete: SetNull)
+  delivery      AuditDelivery?
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([platformId, createdAt])
+  @@index([requestId])
+}
+
+model AuditDelivery {
+  id            String   @id @default(uuid())
+  auditEventId  String   @unique
+  status        OperationStatus @default(PENDING)
+  attempts      Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  deliveredAt   DateTime?
+  lastError     String?
+  event         AuditEvent @relation(fields: [auditEventId], references: [id], onDelete: Restrict)
+  @@index([status, nextAttemptAt])
+}
+
+model AdminOperation {
+  id                   String @id @default(uuid())
+  platformId           String
+  actorId              String
+  type                 String
+  status               OperationStatus @default(PENDING)
+  idempotencyKey       String
+  destinationReference String?
+  reason               String
+  requestPayload       Json?
+  resultSummary        Json?
+  errorCode            String?
+  requestId            String
+  permission           String
+  environmentId        String?
+  resourceScopes       Json?
+  attempts             Int @default(0)
+  nextAttemptAt        DateTime @default(now())
+  requestedAt          DateTime @default(now())
+  startedAt            DateTime?
+  completedAt          DateTime?
+  platform             Platform @relation(fields: [platformId], references: [id])
+  actor                AdminUser @relation(fields: [actorId], references: [id])
+  @@unique([platformId, idempotencyKey])
+  @@index([actorId, requestedAt])
+  @@index([status, nextAttemptAt])
+}
+
+model ApprovalRequest {
+  id                String @id @default(uuid())
+  requesterId       String
+  platformId        String?
+  action            String
+  riskLevel         RiskLevel
+  status            ApprovalStatus @default(PENDING)
+  reason            String
+  payload           Json
+  approvalsRequired Int @default(1)
+  expiresAt         DateTime
+  resolvedAt        DateTime?
+  executedAt        DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  requester         AdminUser @relation("ApprovalRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  platform          Platform? @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  decisions         ApprovalDecision[]
+  @@index([status, expiresAt])
+  @@index([requesterId, createdAt])
+}
+
+model ApprovalDecision {
+  id         String @id @default(uuid())
+  requestId  String
+  approverId String
+  decision   ApprovalDecisionType
+  reason     String
+  createdAt  DateTime @default(now())
+  request    ApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  approver   AdminUser @relation("ApprovalDecider", fields: [approverId], references: [id], onDelete: Restrict)
+  @@unique([requestId, approverId])
+}
+
+model AccessReview {
+  id          String @id @default(uuid())
+  reviewerId  String
+  platformId  String
+  name        String
+  status      AccessReviewStatus @default(DRAFT)
+  dueAt       DateTime
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  reviewer    AdminUser @relation("AccessReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+  platform    Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  items       AccessReviewItem[]
+  @@index([status, dueAt])
+  @@index([reviewerId, status])
+}
+
+model AccessReviewItem {
+  id           String @id @default(uuid())
+  reviewId     String
+  adminUserId  String
+  assignmentId String
+  decision     AccessReviewDecision?
+  reason       String?
+  decidedAt    DateTime?
+  review       AccessReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user         AdminUser @relation("ReviewedAdmin", fields: [adminUserId], references: [id], onDelete: Cascade)
+  assignment   RoleAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  @@unique([reviewId, assignmentId])
+  @@index([adminUserId])
+}
+
+model Notification {
+  id          String @id @default(uuid())
+  adminUserId String
+  type        String
+  title       String
+  message     String
+  href        String?
+  status      NotificationStatus @default(UNREAD)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  readAt      DateTime?
+  user        AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  @@index([adminUserId, status, createdAt])
+}
+
+model EmergencyAccessGrant {
+  id          String @id @default(uuid())
+  adminUserId String
+  requesterId String
+  approverId  String?
+  platformId  String
+  permissions String[]
+  reason      String
+  incidentId  String
+  status      EmergencyAccessStatus @default(PENDING)
+  requestedAt DateTime @default(now())
+  approvedAt  DateTime?
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  user        AdminUser @relation("EmergencyRecipient", fields: [adminUserId], references: [id], onDelete: Cascade)
+  requester   AdminUser @relation("EmergencyRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  approver    AdminUser? @relation("EmergencyApprover", fields: [approverId], references: [id], onDelete: Restrict)
+  platform    Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  @@index([status, expiresAt])
+  @@index([adminUserId, platformId])
+}
