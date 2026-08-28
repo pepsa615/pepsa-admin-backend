@@ -132,6 +132,7 @@ export class BusinessAsAServiceAdapter implements PlatformAdapter {
             permissions: operation?.actor.permissions ?? [],
             requestId,
             environmentId: operation?.actor.environmentId,
+            environment: operation?.actor.environment,
             resourceScopes: operation?.actor.resourceScopes,
             jti: randomUUID(),
             iat: Math.floor(Date.now() / 1000),

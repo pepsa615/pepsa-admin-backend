@@ -32,11 +32,14 @@ const platformPermissions: Array<[string, RiskLevel]> = [
   ['bas.orders.manage', 'HIGH'],
   ['bas.finance.read', 'HIGH'],
   ['bas.pricing.read', 'MEDIUM'],
+  ['bas.pricing.manage', 'HIGH'],
   ['bas.transactions.read', 'HIGH'],
   ['bas.invoices.read', 'HIGH'],
   ['bas.api-keys.read', 'HIGH'],
+  ['bas.api-keys.revoke', 'HIGH'],
   ['bas.wallets.adjust', 'CRITICAL'],
   ['bas.webhooks.read', 'MEDIUM'],
+  ['bas.webhooks.manage', 'HIGH'],
   ['bas.webhooks.replay', 'HIGH'],
   ['bas.audit.read', 'MEDIUM'],
 ];
@@ -52,11 +55,25 @@ async function main() {
       environments: {
         create: [
           { key: 'production', name: 'Production' },
-          { key: 'staging', name: 'Staging' },
+          { key: 'sandbox', name: 'Sandbox' },
         ],
       },
     },
     update: { name: 'Business as a Service', adapterType: 'business-as-a-service' },
+  });
+  await db.platformEnvironment.upsert({
+    where: { platformId_key: { platformId: platform.id, key: 'sandbox' } },
+    create: { platformId: platform.id, key: 'sandbox', name: 'Sandbox' },
+    update: { name: 'Sandbox', status: 'ACTIVE' },
+  });
+  await db.platformEnvironment.updateMany({
+    where: { platformId: platform.id, key: 'staging' },
+    data: { status: 'DISABLED' },
+  });
+  await db.platformEnvironment.upsert({
+    where: { platformId_key: { platformId: platform.id, key: 'production' } },
+    create: { platformId: platform.id, key: 'production', name: 'Production' },
+    update: { name: 'Production', status: 'ACTIVE' },
   });
   const globals = await Promise.all(
     globalPermissions.map(([key, riskLevel, delegatable]) =>

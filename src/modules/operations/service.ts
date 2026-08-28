@@ -27,6 +27,7 @@ export class OperationService {
     query?: URLSearchParams;
     approvalId?: string;
     environmentId?: string;
+    environment?: string;
     assignmentScopes?: Array<{
       resourceScope?: Record<string, unknown>;
       permissions: string[];
@@ -154,6 +155,7 @@ export class OperationService {
           permissions: [capability.permission],
           requestId: input.requestId,
           environmentId: input.environmentId,
+          environment: input.environment,
           resourceScopes,
         },
         idempotencyKey: input.idempotencyKey,
@@ -258,6 +260,9 @@ export class OperationService {
     try {
       if (!adapter)
         throw new AppError(503, 'ADAPTER_UNAVAILABLE', 'Platform adapter is not configured');
+      const selectedEnvironment = pending.environmentId
+        ? await this.db.platformEnvironment.findUnique({ where: { id: pending.environmentId } })
+        : undefined;
       const result = await adapter.execute({
         operation: pending.type,
         method: 'POST',
@@ -267,6 +272,7 @@ export class OperationService {
           permissions: [pending.permission],
           requestId: pending.requestId,
           environmentId: pending.environmentId ?? undefined,
+          environment: selectedEnvironment?.key,
           resourceScopes: Array.isArray(pending.resourceScopes)
             ? (pending.resourceScopes as Array<Record<string, unknown>>)
             : undefined,
@@ -307,7 +313,11 @@ export class OperationService {
       });
       return true;
     } catch (error) {
-      const retry = pending.attempts + 1 < 3;
+      const transient =
+        !(error instanceof AppError) ||
+        error.status >= 500 ||
+        [408, 425, 429].includes(error.status);
+      const retry = transient && pending.attempts + 1 < 3;
       const errorCode = error instanceof AppError ? error.code : 'PLATFORM_ERROR';
       await this.db.adminOperation.update({
         where: { id: pending.id },

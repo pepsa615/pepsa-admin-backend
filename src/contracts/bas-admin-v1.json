@@ -1,6 +1,6 @@
 {
   "openapi": "3.1.0",
-  "info": { "title": "Pepsa BAS Internal Admin API", "version": "1.2.0" },
+  "info": { "title": "Pepsa BAS Internal Admin API", "version": "1.3.0" },
   "servers": [{ "url": "/internal/admin/v1" }],
   "security": [{ "actorToken": [] }],
   "paths": {
@@ -24,6 +24,42 @@
     "/operations/pricing": {
       "get": { "responses": { "200": { "description": "Pricing versions" } } }
     },
+    "/operations/pricing-export": {
+      "get": {
+        "responses": {
+          "200": { "description": "Export an editable platform pricing version as XLSX" }
+        }
+      }
+    },
+    "/operations/pricing-override": {
+      "post": {
+        "responses": { "200": { "description": "Create an audited business pricing override" } }
+      }
+    },
+    "/operations/pricing-import-preview": {
+      "post": {
+        "responses": {
+          "200": { "description": "Validate an XLSX platform price book without changing pricing" }
+        }
+      }
+    },
+    "/operations/pricing-import": {
+      "post": {
+        "responses": {
+          "201": { "description": "Import a validated platform price book as an immutable draft" }
+        }
+      }
+    },
+    "/operations/pricing-version-activate": {
+      "post": {
+        "responses": { "200": { "description": "Activate a draft platform pricing version" } }
+      }
+    },
+    "/operations/pricing-version-rollback": {
+      "post": {
+        "responses": { "200": { "description": "Roll back to a retired platform pricing version" } }
+      }
+    },
     "/operations/transactions": {
       "get": { "responses": { "200": { "description": "Transactions" } } }
     },
@@ -31,8 +67,19 @@
     "/operations/api-keys": {
       "get": { "responses": { "200": { "description": "Redacted API-key metadata" } } }
     },
+    "/operations/api-keys-revoke": {
+      "post": { "responses": { "200": { "description": "Revoke an environment-scoped API key" } } }
+    },
     "/operations/webhooks": {
       "get": { "responses": { "200": { "description": "Redacted webhook deliveries" } } }
+    },
+    "/operations/webhook-endpoints": {
+      "get": { "responses": { "200": { "description": "Environment-scoped webhook endpoints" } } }
+    },
+    "/operations/webhooks-disable": {
+      "post": {
+        "responses": { "200": { "description": "Disable an environment-scoped webhook endpoint" } }
+      }
     },
     "/operations/audit": { "get": { "responses": { "200": { "description": "Platform audit" } } } },
     "/operations/businesses-review": {

@@ -24,7 +24,7 @@ export class PlatformService {
               },
             },
           },
-      include: { environments: true },
+      include: { environments: { where: { status: 'ACTIVE' }, orderBy: { name: 'asc' } } },
       orderBy: { name: 'asc' },
     });
     return rows.map(({ configurationReference: _secretReference, ...platform }) => platform);

@@ -4,6 +4,7 @@ import type { PlatformAdapter } from '../../integrations/adapter.js';
 import { PlatformAdapterRegistry } from '../../integrations/registry.js';
 import type { AuditService } from '../audit/service.js';
 import { OperationService } from './service.js';
+import { AppError } from '../../core/errors.js';
 
 describe('platform isolation', () => {
   it('denies a discovered operation when its scoped permission is missing', async () => {
@@ -146,6 +147,55 @@ describe('platform isolation', () => {
       expect.objectContaining({
         actor: expect.objectContaining({ resourceScopes: [{ businessIds: ['business-1'] }] }),
       }),
+    );
+  });
+
+  it('does not retry a permanent platform conflict', async () => {
+    const execute = vi
+      .fn()
+      .mockRejectedValue(new AppError(409, 'INVALID_REVIEW_STATE', 'Invalid transition'));
+    const adapter: PlatformAdapter = {
+      key: 'business-as-a-service',
+      displayName: 'BAS',
+      checkHealth: vi.fn(),
+      capabilities: vi.fn(),
+      execute,
+    };
+    const registry = new PlatformAdapterRegistry();
+    registry.register(adapter);
+    const update = vi.fn().mockResolvedValue({});
+    const database = {
+      adminOperation: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'operation-id',
+          type: 'businesses-review',
+          attempts: 0,
+          actorId: 'admin-id',
+          platformId: 'platform-id',
+          permission: 'bas.businesses.review',
+          requestId: 'request-id',
+          idempotencyKey: 'key',
+          reason: 'Reviewed customer application',
+          requestPayload: { businessId: 'business-id', status: 'UNDER_REVIEW' },
+          platform: { adapterType: adapter.key, name: 'BAS' },
+        }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        update,
+      },
+    } as unknown as Database;
+    const audit = { record: vi.fn() } as unknown as AuditService;
+    const service = new OperationService(database, registry, audit);
+
+    await expect(service.processNext('worker-id')).resolves.toBe(true);
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'FAILED', errorCode: 'INVALID_REVIEW_STATE' }),
+      }),
+    );
+    expect(update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'PENDING' }) }),
     );
   });
 });

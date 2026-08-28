@@ -43,7 +43,7 @@ describe.skipIf(!database)('access lifecycle persistence', () => {
       where: { scope_key: { scope: platform.key, key: 'read-only-auditor' } },
     });
     const environment = await db.platformEnvironment.findUniqueOrThrow({
-      where: { platformId_key: { platformId: platform.id, key: 'staging' } },
+      where: { platformId_key: { platformId: platform.id, key: 'sandbox' } },
     });
     const audit = new AuditService(db);
     const config = loadConfig({

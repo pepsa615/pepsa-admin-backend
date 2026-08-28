@@ -19,6 +19,7 @@ export class OperationController {
         permissions: response.locals.effectivePermissions as Set<string>,
         requestId: response.locals.requestId,
         environmentId: response.locals.platformEnvironment.id as string,
+        environment: response.locals.platformEnvironment.key as string,
         assignmentScopes: response.locals.assignmentScopes,
         query: new URLSearchParams(
           Object.entries(request.query).flatMap(([key, value]) =>
@@ -39,6 +40,7 @@ export class OperationController {
         requestId: response.locals.requestId,
         idempotencyKey: request.header('idempotency-key') ?? undefined,
         environmentId: response.locals.platformEnvironment.id as string,
+        environment: response.locals.platformEnvironment.key as string,
         assignmentScopes: response.locals.assignmentScopes,
         ...body,
       }),

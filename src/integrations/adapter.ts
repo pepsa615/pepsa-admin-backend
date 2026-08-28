@@ -9,6 +9,7 @@ export interface ActorContext {
   permissions: string[];
   requestId: string;
   environmentId?: string;
+  environment?: string;
   resourceScopes?: Array<Record<string, unknown>>;
 }
 
