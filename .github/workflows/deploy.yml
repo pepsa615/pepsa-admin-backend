@@ -4,42 +4,30 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      ref:
-        description: Git ref to deploy (manual runs only)
-        required: false
-        default: main
 
-permissions:
-  contents: read
+concurrency:
+  group: deploy-admin-backend
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-      SSH_OPTS: -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
     steps:
-      - uses: actions/checkout@v4
+      - name: Deploy admin backend over SSH
+        uses: appleboy/ssh-action@v1.2.0
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
-      - uses: pnpm/action-setup@v4
-        with: { version: 11.18.0 }
-      - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm contract:check && pnpm typecheck && pnpm build
-      - name: Package immutable release
-        run: tar --exclude=.git --exclude=node_modules --exclude=.env -czf "/tmp/pepsa-admin-api-${GITHUB_SHA}.tar.gz" .
-      - name: Load deploy SSH key
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
-      - name: Upload and activate release
-        run: |
-          test -n "$DEPLOY_HOST" || (echo "Missing DEPLOY_HOST repository secret" >&2 && exit 1)
-          test -n "$DEPLOY_USER" || (echo "Missing DEPLOY_USER repository secret" >&2 && exit 1)
-          ssh $SSH_OPTS "$DEPLOY_USER@$DEPLOY_HOST" "echo connected as \$(whoami) on \$(hostname)"
-          scp $SSH_OPTS "/tmp/pepsa-admin-api-${GITHUB_SHA}.tar.gz" "$DEPLOY_USER@$DEPLOY_HOST:/tmp/pepsa-admin-api-${GITHUB_SHA}.tar.gz"
-          ssh $SSH_OPTS "$DEPLOY_USER@$DEPLOY_HOST" "set -euxo pipefail; deploy_root=\"\${HOME}/var/www/admin-backend\"; mkdir -p \"\${deploy_root}/releases/${GITHUB_SHA}\"; tar -xzf '/tmp/pepsa-admin-api-${GITHUB_SHA}.tar.gz' -C \"\${deploy_root}/releases/${GITHUB_SHA}\"; PEPSA_DEPLOY_ROOT=\"\${deploy_root}\" bash \"\${deploy_root}/releases/${GITHUB_SHA}/deploy/scripts/activate.sh\" '${GITHUB_SHA}'"
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script_stop: true
+          command_timeout: 30m
+          script: |
+            set -euo pipefail
+
+            cd "${HOME}/var/www/admin-backend"
+            mkdir -p logs shared
+
+            git fetch origin main
+            git reset --hard origin/main
+
+            bash deploy/scripts/remote-deploy.sh
