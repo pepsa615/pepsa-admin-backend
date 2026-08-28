@@ -41,6 +41,7 @@ import { emergencyAccessRoutes } from './modules/emergency-access/routes.js';
 import { SessionService } from './modules/sessions/service.js';
 import { SessionController } from './modules/sessions/controller.js';
 import { sessionRoutes } from './modules/sessions/routes.js';
+import { internalDeliveryRoutes } from './modules/internal-delivery/routes.js';
 
 export function createApp(config: AppConfig, database: Database = defaultDatabase) {
   const app = express();
@@ -75,6 +76,7 @@ export function createApp(config: AppConfig, database: Database = defaultDatabas
   app.use(express.json({ limit: '1mb' }));
 
   app.get('/metrics', metricsHandler(config.metricsToken));
+  app.use('/internal', internalDeliveryRoutes(config));
   app.use('/admin-api/v1/health', healthRoutes(database, adapters));
   app.use(
     '/admin-api/v1/auth',

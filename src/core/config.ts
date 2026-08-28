@@ -28,6 +28,12 @@ const environmentSchema = z.object({
   PLATFORM_CIRCUIT_OPEN_MS: z.coerce.number().int().positive().max(300_000).default(30_000),
   SESSION_TTL_MINUTES: z.coerce.number().int().positive().max(720).default(60),
   SESSION_IDLE_MINUTES: z.coerce.number().int().positive().max(120).default(15),
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_SECURE: z.coerce.boolean().default(false),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().default('Pepsa Admin <no-reply@pepsa.co>'),
 });
 
 export type AppConfig = ReturnType<typeof loadConfig>;
@@ -81,6 +87,15 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env) {
       retryAttempts: parsed.PLATFORM_RETRY_ATTEMPTS,
       circuitFailureThreshold: parsed.PLATFORM_CIRCUIT_FAILURE_THRESHOLD,
       circuitOpenMs: parsed.PLATFORM_CIRCUIT_OPEN_MS,
+    },
+    email: {
+      host: parsed.SMTP_HOST,
+      port: parsed.SMTP_PORT,
+      secure: parsed.SMTP_SECURE,
+      user: parsed.SMTP_USER,
+      password: parsed.SMTP_PASS,
+      from: parsed.SMTP_FROM,
+      configured: Boolean(parsed.SMTP_HOST),
     },
   } as const;
 }
