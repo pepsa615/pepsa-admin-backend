@@ -20,4 +20,14 @@ describe('admin API foundation', () => {
     expect(response.status).toBe(404);
     expect(response.body.error.code).toBe('NOT_FOUND');
   });
+
+  it('allows PUT in CORS preflight for membership updates', async () => {
+    const response = await request(app)
+      .options('/admin-api/v1/administrators/example-user/membership')
+      .set('Origin', 'http://localhost:5174')
+      .set('Access-Control-Request-Method', 'PUT');
+
+    expect(response.status).toBe(204);
+    expect(response.headers['access-control-allow-methods']).toMatch(/PUT/);
+  });
 });

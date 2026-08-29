@@ -67,7 +67,7 @@ export function createApp(config: AppConfig, database: Database = defaultDatabas
     cors({
       origin: config.frontendOrigin,
       credentials: true,
-      methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     }),
   );
   app.use(requestContext);
