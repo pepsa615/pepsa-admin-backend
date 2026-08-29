@@ -17,7 +17,9 @@ function requireBearerToken(expectedToken: string | undefined) {
     const header = request.headers.authorization;
     const token = header?.startsWith('Bearer ') ? header.slice('Bearer '.length) : undefined;
     if (!expectedToken || !token || token !== expectedToken) {
-      response.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Invalid delivery token' } });
+      response
+        .status(401)
+        .json({ error: { code: 'UNAUTHORIZED', message: 'Invalid delivery token' } });
       return;
     }
     next();
@@ -32,7 +34,7 @@ export function internalDeliveryRoutes(config: AppConfig) {
     requireBearerToken(config.recoveryDelivery?.token),
     async (request, response) => {
       const body = recoveryBodySchema.parse(request.body);
-      const actionUrl = `${config.frontendOrigin}/reset-password?token=${encodeURIComponent(body.token)}`;
+      const actionUrl = `${config.frontendOrigin}/login?reset=${encodeURIComponent(body.token)}`;
 
       await sendIdentityEmail(config, {
         to: body.email,

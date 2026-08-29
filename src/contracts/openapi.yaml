@@ -176,6 +176,16 @@ paths:
         - { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
         - { $ref: '#/components/parameters/Csrf' }
       responses: { '204': { description: Account status updated } }
+  /administrators/{userId}/resend-invitation:
+    post:
+      parameters:
+        - { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/Csrf' }
+      responses:
+        {
+          '202': { description: Administrator invitation resent },
+          '409': { $ref: '#/components/responses/Error' },
+        }
   /administrators/{userId}/membership:
     put:
       parameters:

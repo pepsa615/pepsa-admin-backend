@@ -25,6 +25,13 @@ export const accessRoutes = (controller: AccessController, auth: AuthorizationMi
     auth.requirePermission('admin.users.manage'),
     asyncHandler(controller.status),
   );
+  router.post(
+    '/administrators/:userId/resend-invitation',
+    auth.requireCsrf,
+    auth.requireStepUp,
+    auth.requirePermission('admin.users.manage'),
+    asyncHandler(controller.resendInvitation),
+  );
   router.put(
     '/administrators/:userId/membership',
     auth.requireCsrf,

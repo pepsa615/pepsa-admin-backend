@@ -64,15 +64,14 @@ export class AccessService {
         },
       },
     });
-    await deliverIdentityToken(this.config?.recoveryDelivery, {
-      email: user.email,
-      token: invitationToken,
-      purpose: 'admin-invitation',
-      expiresInMinutes: 24 * 60,
-      requestId: input.requestId,
-      failureCode: 'INVITATION_DELIVERY_FAILED',
-      failureMessage: 'Invitation delivery failed',
-    });
+    try {
+      await this.deliverInvitation(user.email, invitationToken, input.requestId);
+    } catch (error) {
+      // Do not leave an unusable INVITED account that prevents the operator
+      // from retrying with the same email address.
+      await this.db.adminUser.delete({ where: { id: user.id } });
+      throw error;
+    }
     await this.audit.record({
       actorId: input.actorId,
       action: 'admin.invited',
@@ -89,6 +88,69 @@ export class AccessService {
       status: user.status,
       ...(this.config?.environment === 'production' ? {} : { developmentToken: invitationToken }),
     };
+  }
+
+  async resendInvitation(input: {
+    userId: string;
+    actorId: string;
+    requestId: string;
+    reason: string;
+  }) {
+    const user = assertFound(
+      await this.db.adminUser.findUnique({ where: { id: input.userId } }),
+      'Administrator not found',
+    );
+    if (user.status !== 'INVITED')
+      throw new AppError(409, 'ADMIN_NOT_INVITED', 'Only pending invitations can be resent');
+
+    const invitationToken = randomToken(32);
+    const reset = await this.db.$transaction(async (transaction) => {
+      await transaction.passwordResetToken.updateMany({
+        where: { adminUserId: user.id, consumedAt: null },
+        data: { consumedAt: new Date() },
+      });
+      return transaction.passwordResetToken.create({
+        data: {
+          adminUserId: user.id,
+          tokenHash: sha256(`${invitationToken}:${this.config?.session.secret ?? ''}`),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60_000),
+        },
+      });
+    });
+    try {
+      await this.deliverInvitation(user.email, invitationToken, input.requestId);
+    } catch (error) {
+      await this.db.passwordResetToken.update({
+        where: { id: reset.id },
+        data: { consumedAt: new Date() },
+      });
+      throw error;
+    }
+    await this.audit.record({
+      actorId: input.actorId,
+      action: 'admin.invitation.resent',
+      targetType: 'AdminUser',
+      targetId: user.id,
+      outcome: 'SUCCESS',
+      reason: input.reason,
+      requestId: input.requestId,
+    });
+    return {
+      accepted: true,
+      ...(this.config?.environment === 'production' ? {} : { developmentToken: invitationToken }),
+    };
+  }
+
+  private deliverInvitation(email: string, token: string, requestId: string) {
+    return deliverIdentityToken(this.config?.recoveryDelivery, {
+      email,
+      token,
+      purpose: 'admin-invitation',
+      expiresInMinutes: 24 * 60,
+      requestId,
+      failureCode: 'INVITATION_DELIVERY_FAILED',
+      failureMessage: 'Invitation delivery failed',
+    });
   }
 
   async updateStatus(input: {

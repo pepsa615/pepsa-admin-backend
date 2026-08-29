@@ -50,6 +50,15 @@ export class AccessController {
         requestId: response.locals.requestId,
       }),
     });
+  resendInvitation = async (request: Request, response: Response) =>
+    response.status(202).json({
+      data: await this.service.resendInvitation({
+        ...revokeSchema.parse(request.body),
+        userId: String(request.params.userId),
+        actorId: request.admin!.id,
+        requestId: response.locals.requestId,
+      }),
+    });
   status = async (request: Request, response: Response) => {
     await this.service.updateStatus({
       ...statusSchema.parse(request.body),
