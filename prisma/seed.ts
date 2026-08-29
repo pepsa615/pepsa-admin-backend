@@ -28,6 +28,7 @@ const platformPermissions: Array<[string, RiskLevel]> = [
   ['bas.dashboard.read', 'LOW'],
   ['bas.businesses.read', 'MEDIUM'],
   ['bas.businesses.review', 'HIGH'],
+  ['bas.assets.legal-hold', 'HIGH'],
   ['bas.orders.read', 'LOW'],
   ['bas.orders.manage', 'HIGH'],
   ['bas.finance.read', 'HIGH'],
@@ -88,8 +89,14 @@ async function main() {
     platformPermissions.map(([key, riskLevel]) =>
       db.permission.upsert({
         where: { scope_key: { scope: platform.key, key } },
-        create: { scope: platform.key, platformId: platform.id, key, riskLevel, delegatable: true },
-        update: { riskLevel },
+        create: {
+          scope: platform.key,
+          platformId: platform.id,
+          key,
+          riskLevel,
+          delegatable: key !== 'bas.assets.legal-hold',
+        },
+        update: { riskLevel, delegatable: key !== 'bas.assets.legal-hold' },
       }),
     ),
   );
@@ -141,7 +148,12 @@ async function main() {
     },
     update: {},
   });
+  const legalHoldPermission = platformPerms.find(({ key }) => key === 'bas.assets.legal-hold');
+  if (!legalHoldPermission) throw new Error('Asset legal-hold permission was not created');
   await Promise.all([
+    db.rolePermission.deleteMany({
+      where: { roleId: operationsRole.id, permissionId: legalHoldPermission.id },
+    }),
     ...globals.map((permission) =>
       db.rolePermission.upsert({
         where: { roleId_permissionId: { roleId: superRole.id, permissionId: permission.id } },
@@ -189,13 +201,17 @@ async function main() {
           update: {},
         }),
       ),
-    ...platformPerms.map((permission) =>
-      db.rolePermission.upsert({
-        where: { roleId_permissionId: { roleId: operationsRole.id, permissionId: permission.id } },
-        create: { roleId: operationsRole.id, permissionId: permission.id },
-        update: {},
-      }),
-    ),
+    ...platformPerms
+      .filter(({ key }) => key !== 'bas.assets.legal-hold')
+      .map((permission) =>
+        db.rolePermission.upsert({
+          where: {
+            roleId_permissionId: { roleId: operationsRole.id, permissionId: permission.id },
+          },
+          create: { roleId: operationsRole.id, permissionId: permission.id },
+          update: {},
+        }),
+      ),
     ...platformPerms
       .filter(({ key }) => key.endsWith('.read'))
       .map((permission) =>
