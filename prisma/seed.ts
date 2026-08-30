@@ -222,6 +222,7 @@ async function main() {
         }),
       ),
   ]);
+  
   const email = process.env.BOOTSTRAP_ADMIN_EMAIL?.toLowerCase();
   const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
   const email2 = process.env.BOOTSTRAP_ADMIN2_EMAIL?.toLowerCase();
