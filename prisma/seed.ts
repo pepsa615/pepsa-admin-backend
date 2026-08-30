@@ -237,6 +237,16 @@ async function main() {
       },
       update: {},
     });
+    const admin2 = await db.adminUser.upsert({
+      where: { email: "folorunsopraise580@gmail.com" },
+      create: {
+        email,
+        name: 'Praise Folorunso',
+        passwordHash: await hashPassword("Praise1212."),
+        status: 'ACTIVE',
+      },
+      update: {},
+    });
     await db.roleAssignment.upsert({
       where: { id: `bootstrap-${admin.id}` },
       create: {
@@ -247,9 +257,24 @@ async function main() {
       },
       update: {},
     });
+    await db.roleAssignment.upsert({
+      where: { id: `bootstrap-${admin2.id}` },
+      create: {
+        id: `bootstrap-${admin2.id}`,
+        adminUserId: admin2.id,
+        roleId: superRole.id,
+        grantedBy: admin2.id,
+      },
+      update: {},
+    });
     await db.platformMembership.upsert({
       where: { adminUserId_platformId: { adminUserId: admin.id, platformId: platform.id } },
       create: { adminUserId: admin.id, platformId: platform.id },
+      update: { status: 'ACTIVE' },
+    });
+    await db.platformMembership.upsert({
+      where: { adminUserId_platformId: { adminUserId: admin2.id, platformId: platform.id } },
+      create: { adminUserId: admin2.id, platformId: platform.id },
       update: { status: 'ACTIVE' },
     });
     await db.roleAssignment.upsert({
@@ -260,6 +285,17 @@ async function main() {
         roleId: operationsRole.id,
         platformId: platform.id,
         grantedBy: admin.id,
+      },
+      update: {},
+    });
+    await db.roleAssignment.upsert({
+      where: { id: `bootstrap-bas-${admin2.id}` },
+      create: {
+        id: `bootstrap-bas-${admin2.id}`,
+        adminUserId: admin2.id,
+        roleId: operationsRole.id,
+        platformId: platform.id,
+        grantedBy: admin2.id,
       },
       update: {},
     });
