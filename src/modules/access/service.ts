@@ -100,8 +100,12 @@ export class AccessService {
       await this.db.adminUser.findUnique({ where: { id: input.userId } }),
       'Administrator not found',
     );
-    if (user.status !== 'INVITED')
-      throw new AppError(409, 'ADMIN_NOT_INVITED', 'Only pending invitations can be resent');
+    if (user.mfaStatus === 'ENABLED' || user.lastLoginAt)
+      throw new AppError(
+        409,
+        'ADMIN_ALREADY_ONBOARDED',
+        'Invitations can only be resent before MFA setup and the first sign-in',
+      );
 
     const invitationToken = randomToken(32);
     const reset = await this.db.$transaction(async (transaction) => {
