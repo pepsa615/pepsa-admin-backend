@@ -224,25 +224,20 @@ async function main() {
   ]);
   const email = process.env.BOOTSTRAP_ADMIN_EMAIL?.toLowerCase();
   const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
-  if (email && password) {
-    if (password.length < 14)
-      throw new Error('BOOTSTRAP_ADMIN_PASSWORD must contain at least 14 characters');
+  const email2 = process.env.BOOTSTRAP_ADMIN2_EMAIL?.toLowerCase();
+  const password2 = process.env.BOOTSTRAP_ADMIN2_PASSWORD;
+
+  async function upsertBootstrapAdmin(input: {
+    email: string;
+    password: string;
+    name: string;
+  }) {
     const admin = await db.adminUser.upsert({
-      where: { email },
+      where: { email: input.email },
       create: {
-        email,
-        name: 'Bootstrap Administrator',
-        passwordHash: await hashPassword(password),
-        status: 'ACTIVE',
-      },
-      update: {},
-    });
-    const admin2 = await db.adminUser.upsert({
-      where: { email: "folorunsopraise580@gmail.com" },
-      create: {
-        email,
-        name: 'Praise Folorunso',
-        passwordHash: await hashPassword("Praise1212."),
+        email: input.email,
+        name: input.name,
+        passwordHash: await hashPassword(input.password),
         status: 'ACTIVE',
       },
       update: {},
@@ -257,24 +252,9 @@ async function main() {
       },
       update: {},
     });
-    await db.roleAssignment.upsert({
-      where: { id: `bootstrap-${admin2.id}` },
-      create: {
-        id: `bootstrap-${admin2.id}`,
-        adminUserId: admin2.id,
-        roleId: superRole.id,
-        grantedBy: admin2.id,
-      },
-      update: {},
-    });
     await db.platformMembership.upsert({
       where: { adminUserId_platformId: { adminUserId: admin.id, platformId: platform.id } },
       create: { adminUserId: admin.id, platformId: platform.id },
-      update: { status: 'ACTIVE' },
-    });
-    await db.platformMembership.upsert({
-      where: { adminUserId_platformId: { adminUserId: admin2.id, platformId: platform.id } },
-      create: { adminUserId: admin2.id, platformId: platform.id },
       update: { status: 'ACTIVE' },
     });
     await db.roleAssignment.upsert({
@@ -288,16 +268,26 @@ async function main() {
       },
       update: {},
     });
-    await db.roleAssignment.upsert({
-      where: { id: `bootstrap-bas-${admin2.id}` },
-      create: {
-        id: `bootstrap-bas-${admin2.id}`,
-        adminUserId: admin2.id,
-        roleId: operationsRole.id,
-        platformId: platform.id,
-        grantedBy: admin2.id,
-      },
-      update: {},
+    return admin;
+  }
+
+  if (email && password) {
+    if (password.length < 14)
+      throw new Error('BOOTSTRAP_ADMIN_PASSWORD must contain at least 14 characters');
+    await upsertBootstrapAdmin({
+      email,
+      password,
+      name: 'Bootstrap Administrator',
+    });
+  }
+
+  if (email2 && password2) {
+    if (password2.length < 14)
+      throw new Error('BOOTSTRAP_ADMIN2_PASSWORD must contain at least 14 characters');
+    await upsertBootstrapAdmin({
+      email: email2,
+      password: password2,
+      name: process.env.BOOTSTRAP_ADMIN2_NAME?.trim() || 'Bootstrap Administrator',
     });
   }
 }
