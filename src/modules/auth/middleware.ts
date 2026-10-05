@@ -151,9 +151,8 @@ export class AuthorizationMiddleware {
       });
       return next(new AppError(404, 'NOT_FOUND', 'Platform not found'));
     }
-    const environmentKey = request.header('x-platform-environment') ?? 'production';
-    const environment = await this.db.platformEnvironment.findUnique({
-      where: { platformId_key: { platformId: platform.id, key: environmentKey } },
+    const environment = await this.db.platformEnvironment.findFirst({
+      where: { platformId: platform.id, key: 'production', status: 'ACTIVE' },
     });
     if (!environment) {
       await this.audit.record({
@@ -162,10 +161,11 @@ export class AuthorizationMiddleware {
         action: 'authorization.environment.denied',
         outcome: 'DENIED',
         requestId: response.locals.requestId,
-        metadata: { attemptedEnvironmentKey: environmentKey },
+        metadata: { attemptedEnvironmentKey: 'production' },
       });
       return next(new AppError(404, 'ENVIRONMENT_NOT_FOUND', 'Platform environment not found'));
     }
+    // Deploy-lane isolation: ignore client x-platform-environment; sole ACTIVE env is production.
     const matchingScopes =
       request.admin?.assignmentScopes.filter(
         (scope) =>

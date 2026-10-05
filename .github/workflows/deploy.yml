@@ -2,18 +2,34 @@ name: Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [staging, main]
   workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to deploy
+        required: true
+        type: choice
+        options: [staging, production]
 
-concurrency:
-  group: deploy-admin-backend
-  cancel-in-progress: false
+permissions:
+  contents: read
 
 jobs:
-  deploy:
+  verify:
+    uses: ./.github/workflows/ci.yml
+
+  deploy-staging:
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/staging') ||
+      (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging')
     runs-on: ubuntu-latest
+    needs: verify
+    environment: staging
+    concurrency:
+      group: deploy-admin-backend-staging
+      cancel-in-progress: false
     steps:
-      - name: Deploy admin backend over SSH
+      - name: Deploy admin backend to staging
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -23,11 +39,65 @@ jobs:
           command_timeout: 30m
           script: |
             set -euo pipefail
-
-            cd "${HOME}/var/www/admin-backend"
+            deploy_root="${HOME}/var/www/admin-backend-staging"
+            cd "$deploy_root"
             mkdir -p logs shared
+            git fetch origin staging
+            git reset --hard origin/staging
+            PEPSA_DEPLOY_ROOT="$deploy_root" PEPSA_PM2_ENV=staging bash deploy/scripts/remote-deploy.sh
 
+  deploy-production:
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.environment == 'production')
+    runs-on: ubuntu-latest
+    needs: verify
+    environment: production
+    concurrency:
+      group: deploy-admin-backend-production
+      cancel-in-progress: false
+    steps:
+      - name: Deploy admin backend to production
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script_stop: true
+          command_timeout: 30m
+          script: |
+            set -euo pipefail
+            deploy_root="${HOME}/var/www/admin-backend"
+            cd "$deploy_root"
+            mkdir -p logs shared
             git fetch origin main
             git reset --hard origin/main
+            PEPSA_DEPLOY_ROOT="$deploy_root" PEPSA_PM2_ENV=production bash deploy/scripts/remote-deploy.sh
 
-            bash deploy/scripts/remote-deploy.sh
+  smoke-staging:
+    if: >-
+      ((github.event_name == 'push' && github.ref == 'refs/heads/staging') ||
+      (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging')) &&
+      vars.ADMIN_STAGING_SMOKE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    environment: staging
+    concurrency:
+      group: smoke-admin-backend-staging
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 11.18.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22.14, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Run staging smoke
+        env:
+          ADMIN_STAGING_URL: ${{ secrets.ADMIN_STAGING_URL }}
+          ORDER_SERVICE_BASE_URL: ${{ secrets.ORDER_SERVICE_BASE_URL }}
+          PAYMENT_SERVICE_BASE_URL: ${{ secrets.PAYMENT_SERVICE_BASE_URL }}
+          ORDER_SERVICE_AUDIENCE: ${{ secrets.ORDER_SERVICE_AUDIENCE }}
+          PAYMENT_SERVICE_AUDIENCE: ${{ secrets.PAYMENT_SERVICE_AUDIENCE }}
+          ACTOR_SIGNING_SECRET: ${{ secrets.ACTOR_SIGNING_SECRET }}
+        run: node scripts/staging-smoke.mjs

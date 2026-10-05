@@ -22,6 +22,8 @@
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "contract:check": "node scripts/check-contract.mjs",
+    "catalogue:check": "node scripts/check-permission-catalogue.mjs",
+    "smoke:staging": "node scripts/staging-smoke.mjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:dev": "prisma migrate dev",

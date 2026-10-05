@@ -25,6 +25,14 @@ set +a
 source "$deploy_root/deploy/scripts/bootstrap-node.sh"
 
 export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=2048}"
+export PEPSA_PM2_ENV="${PEPSA_PM2_ENV:-production}"
+if [[ -z "${PORT:-}" ]]; then
+  if [[ "$PEPSA_PM2_ENV" == "staging" ]]; then
+    export PORT=3301
+  else
+    export PORT=3300
+  fi
+fi
 
 pnpm install --frozen-lockfile
 pnpm prisma:generate
@@ -33,7 +41,7 @@ pnpm prisma:migrate
 
 pm2 startOrReload ecosystem.config.cjs --update-env
 
-bash deploy/scripts/wait-for-http.sh http://127.0.0.1:3300/admin-api/v1/health/live
+bash deploy/scripts/wait-for-http.sh "http://127.0.0.1:${PORT}/admin-api/v1/health/live"
 
 pm2 save
-echo "Admin backend deployed at $(git rev-parse --short HEAD)"
+echo "Admin backend deployed at $(git rev-parse --short HEAD) (PEPSA_PM2_ENV=${PEPSA_PM2_ENV}, PORT=${PORT})"

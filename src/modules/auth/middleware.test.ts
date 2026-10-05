@@ -25,11 +25,11 @@ describe('platform and environment isolation', () => {
     expect(next.mock.calls[0]?.[0]).toMatchObject({ status: 404, code: 'NOT_FOUND' });
   });
 
-  it('narrows effective permissions to the requested environment', async () => {
+  it('ignores client environment headers and uses the sole ACTIVE production env', async () => {
     const db = {
       platform: { findUnique: vi.fn().mockResolvedValue({ id: 'platform-a', key: 'a' }) },
       platformEnvironment: {
-        findUnique: vi.fn().mockResolvedValue({ id: 'prod-id', key: 'production' }),
+        findFirst: vi.fn().mockResolvedValue({ id: 'prod-id', key: 'production' }),
       },
     } as unknown as Database;
     const middleware = new AuthorizationMiddleware(db, loadConfig({ NODE_ENV: 'test' }), {
@@ -37,17 +37,12 @@ describe('platform and environment isolation', () => {
     } as unknown as AuditService);
     const request = {
       params: { platformKey: 'a' },
-      header: vi.fn().mockReturnValue('production'),
+      header: vi.fn().mockReturnValue('sandbox'),
       admin: {
         platformIds: new Set(['platform-a']),
-        permissions: new Set(['a.read', 'a.staging.write']),
+        permissions: new Set(['a.read']),
         assignmentScopes: [
           { platformId: 'platform-a', environmentId: undefined, permissions: ['a.read'] },
-          {
-            platformId: 'platform-a',
-            environmentId: 'staging-id',
-            permissions: ['a.staging.write'],
-          },
         ],
       },
     } as unknown as Request;
@@ -56,6 +51,7 @@ describe('platform and environment isolation', () => {
     await middleware.requirePlatform(request, res, next);
     expect(next).toHaveBeenCalledWith();
     expect(res.locals.effectivePermissions).toEqual(new Set(['a.read']));
+    expect(res.locals.platformEnvironment).toEqual({ id: 'prod-id', key: 'production' });
   });
 
   it('rejects a missing CSRF token', () => {

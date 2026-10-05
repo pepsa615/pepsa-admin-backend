@@ -190,6 +190,15 @@ export class OperationService {
           data: {
             status: 'FAILED',
             errorCode: error instanceof AppError ? error.code : 'PLATFORM_ERROR',
+            resultSummary: {
+              message:
+                error instanceof AppError
+                  ? error.message
+                  : 'The platform operation failed unexpectedly',
+              ...(error instanceof AppError && error.details !== undefined
+                ? { details: error.details as Prisma.InputJsonValue }
+                : {}),
+            },
             completedAt: new Date(),
           },
         });
@@ -202,13 +211,19 @@ export class OperationService {
         outcome: 'FAILURE',
         reason: input.reason,
         requestId: input.requestId,
-        metadata: { errorCode: error instanceof AppError ? error.code : 'PLATFORM_ERROR' },
+        metadata: {
+          errorCode: error instanceof AppError ? error.code : 'PLATFORM_ERROR',
+          message: error instanceof AppError ? error.message : undefined,
+        },
       });
       await this.notifications?.create({
         adminUserId: input.actorId,
         type: 'operation.failed',
         title: 'Platform operation failed',
-        message: `${input.operation} failed on ${platform.name}.`,
+        message:
+          error instanceof AppError
+            ? `${input.operation} failed on ${platform.name}: ${error.message}`
+            : `${input.operation} failed on ${platform.name}.`,
         href: '/operations',
         metadata: {
           operationId: record?.id,
@@ -319,6 +334,15 @@ export class OperationService {
         [408, 425, 429].includes(error.status);
       const retry = transient && pending.attempts + 1 < 3;
       const errorCode = error instanceof AppError ? error.code : 'PLATFORM_ERROR';
+      const failureSummary = {
+        message:
+          error instanceof AppError
+            ? error.message
+            : 'The platform operation failed unexpectedly',
+        ...(error instanceof AppError && error.details !== undefined
+          ? { details: error.details as Prisma.InputJsonValue }
+          : {}),
+      };
       await this.db.adminOperation.update({
         where: { id: pending.id },
         data: retry
@@ -326,8 +350,14 @@ export class OperationService {
               status: 'PENDING',
               nextAttemptAt: new Date(Date.now() + 1_000 * 2 ** pending.attempts),
               errorCode,
+              resultSummary: failureSummary,
             }
-          : { status: 'FAILED', completedAt: new Date(), errorCode },
+          : {
+              status: 'FAILED',
+              completedAt: new Date(),
+              errorCode,
+              resultSummary: failureSummary,
+            },
       });
       await this.audit.record({
         actorId: pending.actorId,
@@ -338,14 +368,14 @@ export class OperationService {
         outcome: 'FAILURE',
         reason: pending.reason,
         requestId: pending.requestId,
-        metadata: { workerId, errorCode, retry },
+        metadata: { workerId, errorCode, retry, message: failureSummary.message },
       });
       if (!retry)
         await this.notifications?.create({
           adminUserId: pending.actorId,
           type: 'operation.failed',
           title: 'Platform operation failed',
-          message: `${pending.type} failed on ${pending.platform.name}.`,
+          message: `${pending.type} failed on ${pending.platform.name}: ${failureSummary.message}`,
           href: '/operations',
           metadata: { operationId: pending.id, errorCode },
         });

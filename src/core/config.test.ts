@@ -30,3 +30,36 @@ describe('session cookie configuration', () => {
     });
   });
 });
+
+describe('platform service configuration', () => {
+  it('exposes order and payment service blocks with shared resilience knobs', () => {
+    const config = loadConfig({
+      NODE_ENV: 'test',
+      ORDER_SERVICE_BASE_URL: 'http://localhost:3100',
+      ORDER_SERVICE_AUDIENCE: 'pepsa-order',
+      PAYMENT_SERVICE_BASE_URL: 'http://localhost:3400',
+      PAYMENT_SERVICE_AUDIENCE: 'pepsa-payment',
+      PLATFORM_REQUEST_TIMEOUT_MS: '4000',
+      PLATFORM_RETRY_ATTEMPTS: '1',
+      PLATFORM_CIRCUIT_FAILURE_THRESHOLD: '3',
+      PLATFORM_CIRCUIT_OPEN_MS: '15000',
+    });
+
+    expect(config.orderService).toEqual({
+      baseUrl: 'http://localhost:3100',
+      audience: 'pepsa-order',
+      timeoutMs: 4000,
+      retryAttempts: 1,
+      circuitFailureThreshold: 3,
+      circuitOpenMs: 15000,
+    });
+    expect(config.paymentService).toEqual({
+      baseUrl: 'http://localhost:3400',
+      audience: 'pepsa-payment',
+      timeoutMs: 4000,
+      retryAttempts: 1,
+      circuitFailureThreshold: 3,
+      circuitOpenMs: 15000,
+    });
+  });
+});

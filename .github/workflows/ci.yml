@@ -1,5 +1,14 @@
 name: Admin backend CI
-on: [push, pull_request]
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -30,6 +39,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm prisma:migrate
       - run: pnpm prisma:seed
+      - run: node scripts/check-permission-catalogue.mjs
       - run: pnpm verify
       - run: pnpm format:check
       - uses: actions/upload-artifact@v4

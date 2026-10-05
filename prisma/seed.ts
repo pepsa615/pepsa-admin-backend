@@ -24,7 +24,7 @@ const globalPermissions: Array<[string, RiskLevel, boolean]> = [
   ['admin.emergency.request', 'CRITICAL', false],
   ['admin.emergency.approve', 'CRITICAL', false],
 ];
-const platformPermissions: Array<[string, RiskLevel]> = [
+const basPermissions: Array<[string, RiskLevel]> = [
   ['bas.dashboard.read', 'LOW'],
   ['bas.businesses.read', 'MEDIUM'],
   ['bas.businesses.review', 'HIGH'],
@@ -44,38 +44,190 @@ const platformPermissions: Array<[string, RiskLevel]> = [
   ['bas.webhooks.replay', 'HIGH'],
   ['bas.audit.read', 'MEDIUM'],
 ];
+const orderPermissions: Array<[string, RiskLevel, boolean]> = [
+  ['order.catalog.read', 'LOW', true],
+  ['order.partners.read', 'LOW', true],
+  ['order.partners.write', 'HIGH', true],
+  ['order.credentials.issue', 'CRITICAL', false],
+  ['order.credentials.revoke', 'CRITICAL', false],
+  ['order.fleet.read', 'LOW', true],
+  ['order.fleet.sync', 'MEDIUM', true],
+  ['order.processing.read', 'LOW', true],
+  ['order.processing.run', 'HIGH', true],
+  ['order.processing.manual', 'HIGH', false],
+  ['order.dispatch.read', 'LOW', true],
+  ['order.dispatch.write', 'HIGH', true],
+  ['order.dispatch.refund', 'CRITICAL', false],
+  ['order.operations.policies.read', 'LOW', true],
+  ['order.operations.policies.write', 'CRITICAL', false],
+  ['order.events.read', 'MEDIUM', true],
+  ['order.events.operate', 'HIGH', true],
+  ['order.integrations.read', 'LOW', true],
+  ['order.integrations.write', 'HIGH', false],
+];
+const paymentPermissions: Array<[string, RiskLevel, boolean]> = [
+  ['payment.platforms.read', 'LOW', true],
+  ['payment.platforms.write', 'HIGH', false],
+  ['payment.platforms.keys.rotate', 'CRITICAL', false],
+  ['payment.platforms.status', 'CRITICAL', false],
+  ['payment.settings.transfer', 'HIGH', true],
+  ['payment.settings.vas', 'HIGH', true],
+  ['payment.settings.settlement', 'HIGH', true],
+  ['payment.sva.provisioning.read', 'MEDIUM', true],
+  ['payment.sva.provisioning.reconcile', 'CRITICAL', false],
+  ['payment.checkout.provisioning.read', 'MEDIUM', true],
+  ['payment.checkout.provisioning.reconcile', 'CRITICAL', false],
+  ['payment.kyc.encryption.rotate', 'CRITICAL', false],
+];
 
-async function main() {
+async function upsertPlatformWithEnvironments(input: {
+  key: string;
+  name: string;
+  description: string;
+  adapterType: string;
+  /** Fail-closed: order/payment production stays DISABLED until evidence review. */
+  productionStatus?: 'ACTIVE' | 'DISABLED';
+}) {
+  const productionStatus = input.productionStatus ?? 'ACTIVE';
   const platform = await db.platform.upsert({
-    where: { key: 'business-as-a-service' },
+    where: { key: input.key },
     create: {
-      key: 'business-as-a-service',
-      name: 'Business as a Service',
-      description: 'Pepsa business operations platform',
-      adapterType: 'business-as-a-service',
+      key: input.key,
+      name: input.name,
+      description: input.description,
+      adapterType: input.adapterType,
       environments: {
-        create: [
-          { key: 'production', name: 'Production' },
-          { key: 'sandbox', name: 'Sandbox' },
-        ],
+        create: [{ key: 'production', name: 'Production', status: productionStatus }],
       },
     },
-    update: { name: 'Business as a Service', adapterType: 'business-as-a-service' },
+    update: { name: input.name, adapterType: input.adapterType, description: input.description },
   });
-  await db.platformEnvironment.upsert({
-    where: { platformId_key: { platformId: platform.id, key: 'sandbox' } },
-    create: { platformId: platform.id, key: 'sandbox', name: 'Sandbox' },
-    update: { name: 'Sandbox', status: 'ACTIVE' },
+  // Deploy-lane isolation: one ACTIVE PlatformEnvironment per platform (key always `production`).
+  const obsoleteEnvs = await db.platformEnvironment.findMany({
+    where: { platformId: platform.id, key: { not: 'production' } },
+    select: { id: true },
   });
-  await db.platformEnvironment.updateMany({
-    where: { platformId: platform.id, key: 'staging' },
-    data: { status: 'DISABLED' },
-  });
+  if (obsoleteEnvs.length) {
+    await db.roleAssignment.updateMany({
+      where: { environmentId: { in: obsoleteEnvs.map(({ id }) => id) } },
+      data: { environmentId: null },
+    });
+    await db.platformEnvironment.updateMany({
+      where: { id: { in: obsoleteEnvs.map(({ id }) => id) } },
+      data: { status: 'DISABLED' },
+    });
+  }
   await db.platformEnvironment.upsert({
     where: { platformId_key: { platformId: platform.id, key: 'production' } },
-    create: { platformId: platform.id, key: 'production', name: 'Production' },
-    update: { name: 'Production', status: 'ACTIVE' },
+    create: {
+      platformId: platform.id,
+      key: 'production',
+      name: 'Production',
+      status: productionStatus,
+    },
+    update: { name: 'Production', status: productionStatus },
   });
+  return platform;
+}
+
+async function seedPlatformAccess(input: {
+  platformId: string;
+  platformKey: string;
+  permissions: Array<[string, RiskLevel, boolean]>;
+  operationsExclusions?: string[];
+}) {
+  const platformPerms = await Promise.all(
+    input.permissions.map(([key, riskLevel, delegatable]) =>
+      db.permission.upsert({
+        where: { scope_key: { scope: input.platformKey, key } },
+        create: {
+          scope: input.platformKey,
+          platformId: input.platformId,
+          key,
+          riskLevel,
+          delegatable,
+        },
+        update: { riskLevel, delegatable },
+      }),
+    ),
+  );
+  const operationsRole = await db.role.upsert({
+    where: { scope_key: { scope: input.platformKey, key: 'operations-admin' } },
+    create: {
+      scope: input.platformKey,
+      platformId: input.platformId,
+      key: 'operations-admin',
+      name: 'Operations Admin',
+      isSystemRole: true,
+    },
+    update: {},
+  });
+  const readonlyRole = await db.role.upsert({
+    where: { scope_key: { scope: input.platformKey, key: 'read-only-auditor' } },
+    create: {
+      scope: input.platformKey,
+      platformId: input.platformId,
+      key: 'read-only-auditor',
+      name: 'Read-only Auditor',
+      isSystemRole: true,
+    },
+    update: {},
+  });
+  const exclusions = new Set(input.operationsExclusions ?? []);
+  await Promise.all([
+    ...[...exclusions].map(async (key) => {
+      const permission = platformPerms.find((entry) => entry.key === key);
+      if (!permission) return;
+      await db.rolePermission.deleteMany({
+        where: { roleId: operationsRole.id, permissionId: permission.id },
+      });
+    }),
+    ...platformPerms
+      .filter(({ key }) => !exclusions.has(key))
+      .map((permission) =>
+        db.rolePermission.upsert({
+          where: {
+            roleId_permissionId: { roleId: operationsRole.id, permissionId: permission.id },
+          },
+          create: { roleId: operationsRole.id, permissionId: permission.id },
+          update: {},
+        }),
+      ),
+    ...platformPerms
+      .filter(({ key }) => key.endsWith('.read'))
+      .map((permission) =>
+        db.rolePermission.upsert({
+          where: { roleId_permissionId: { roleId: readonlyRole.id, permissionId: permission.id } },
+          create: { roleId: readonlyRole.id, permissionId: permission.id },
+          update: {},
+        }),
+      ),
+  ]);
+  return { operationsRole, readonlyRole, platformPerms };
+}
+
+async function main() {
+  const basPlatform = await upsertPlatformWithEnvironments({
+    key: 'business-as-a-service',
+    name: 'Business as a Service',
+    description: 'Pepsa business operations platform',
+    adapterType: 'business-as-a-service',
+  });
+  const orderPlatform = await upsertPlatformWithEnvironments({
+    key: 'pepsa-order',
+    name: 'Pepsa Order',
+    description: 'Pepsa order and dispatch platform',
+    adapterType: 'pepsa-order',
+    productionStatus: 'DISABLED',
+  });
+  const paymentPlatform = await upsertPlatformWithEnvironments({
+    key: 'pepsa-payment',
+    name: 'Pepsa Payment',
+    description: 'Pepsa payment platform',
+    adapterType: 'pepsa-payment',
+    productionStatus: 'DISABLED',
+  });
+
   const globals = await Promise.all(
     globalPermissions.map(([key, riskLevel, delegatable]) =>
       db.permission.upsert({
@@ -85,21 +237,28 @@ async function main() {
       }),
     ),
   );
-  const platformPerms = await Promise.all(
-    platformPermissions.map(([key, riskLevel]) =>
-      db.permission.upsert({
-        where: { scope_key: { scope: platform.key, key } },
-        create: {
-          scope: platform.key,
-          platformId: platform.id,
-          key,
-          riskLevel,
-          delegatable: key !== 'bas.assets.legal-hold',
-        },
-        update: { riskLevel, delegatable: key !== 'bas.assets.legal-hold' },
-      }),
-    ),
-  );
+
+  const basAccess = await seedPlatformAccess({
+    platformId: basPlatform.id,
+    platformKey: basPlatform.key,
+    permissions: basPermissions.map(([key, riskLevel]) => [
+      key,
+      riskLevel,
+      key !== 'bas.assets.legal-hold',
+    ]),
+    operationsExclusions: ['bas.assets.legal-hold'],
+  });
+  await seedPlatformAccess({
+    platformId: orderPlatform.id,
+    platformKey: orderPlatform.key,
+    permissions: orderPermissions,
+  });
+  await seedPlatformAccess({
+    platformId: paymentPlatform.id,
+    platformKey: paymentPlatform.key,
+    permissions: paymentPermissions,
+  });
+
   const superRole = await db.role.upsert({
     where: { scope_key: { scope: 'global', key: 'super-admin' } },
     create: {
@@ -126,34 +285,8 @@ async function main() {
     },
     update: {},
   });
-  const operationsRole = await db.role.upsert({
-    where: { scope_key: { scope: platform.key, key: 'operations-admin' } },
-    create: {
-      scope: platform.key,
-      platformId: platform.id,
-      key: 'operations-admin',
-      name: 'Operations Admin',
-      isSystemRole: true,
-    },
-    update: {},
-  });
-  const readonlyRole = await db.role.upsert({
-    where: { scope_key: { scope: platform.key, key: 'read-only-auditor' } },
-    create: {
-      scope: platform.key,
-      platformId: platform.id,
-      key: 'read-only-auditor',
-      name: 'Read-only Auditor',
-      isSystemRole: true,
-    },
-    update: {},
-  });
-  const legalHoldPermission = platformPerms.find(({ key }) => key === 'bas.assets.legal-hold');
-  if (!legalHoldPermission) throw new Error('Asset legal-hold permission was not created');
+
   await Promise.all([
-    db.rolePermission.deleteMany({
-      where: { roleId: operationsRole.id, permissionId: legalHoldPermission.id },
-    }),
     ...globals.map((permission) =>
       db.rolePermission.upsert({
         where: { roleId_permissionId: { roleId: superRole.id, permissionId: permission.id } },
@@ -201,28 +334,8 @@ async function main() {
           update: {},
         }),
       ),
-    ...platformPerms
-      .filter(({ key }) => key !== 'bas.assets.legal-hold')
-      .map((permission) =>
-        db.rolePermission.upsert({
-          where: {
-            roleId_permissionId: { roleId: operationsRole.id, permissionId: permission.id },
-          },
-          create: { roleId: operationsRole.id, permissionId: permission.id },
-          update: {},
-        }),
-      ),
-    ...platformPerms
-      .filter(({ key }) => key.endsWith('.read'))
-      .map((permission) =>
-        db.rolePermission.upsert({
-          where: { roleId_permissionId: { roleId: readonlyRole.id, permissionId: permission.id } },
-          create: { roleId: readonlyRole.id, permissionId: permission.id },
-          update: {},
-        }),
-      ),
   ]);
-  
+
   const email = process.env.BOOTSTRAP_ADMIN_EMAIL?.toLowerCase();
   const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
   const email2 = process.env.BOOTSTRAP_ADMIN2_EMAIL?.toLowerCase();
@@ -253,9 +366,10 @@ async function main() {
       },
       update: {},
     });
+    // BAS membership only — order/payment membership is granted explicitly.
     await db.platformMembership.upsert({
-      where: { adminUserId_platformId: { adminUserId: admin.id, platformId: platform.id } },
-      create: { adminUserId: admin.id, platformId: platform.id },
+      where: { adminUserId_platformId: { adminUserId: admin.id, platformId: basPlatform.id } },
+      create: { adminUserId: admin.id, platformId: basPlatform.id },
       update: { status: 'ACTIVE' },
     });
     await db.roleAssignment.upsert({
@@ -263,8 +377,8 @@ async function main() {
       create: {
         id: `bootstrap-bas-${admin.id}`,
         adminUserId: admin.id,
-        roleId: operationsRole.id,
-        platformId: platform.id,
+        roleId: basAccess.operationsRole.id,
+        platformId: basPlatform.id,
         grantedBy: admin.id,
       },
       update: {},
