@@ -213,19 +213,29 @@ async function main() {
     description: 'Pepsa business operations platform',
     adapterType: 'business-as-a-service',
   });
+  // Staging admin lane: ACTIVE so Order/Payment UI and capabilities work against staging hosts.
+  // Production admin lane: DISABLED until docs/admin/PRODUCTION_ENABLEMENT.md sign-off
+  // (override with SEED_ORDER_PAYMENT_ENV_ACTIVE=1|0).
+  const orderPaymentEnvActive =
+    process.env.SEED_ORDER_PAYMENT_ENV_ACTIVE === '1'
+      ? true
+      : process.env.SEED_ORDER_PAYMENT_ENV_ACTIVE === '0'
+        ? false
+        : process.env.PEPSA_PM2_ENV === 'staging' || process.env.NODE_ENV !== 'production';
+  const orderPaymentEnvStatus = orderPaymentEnvActive ? 'ACTIVE' : 'DISABLED';
   const orderPlatform = await upsertPlatformWithEnvironments({
     key: 'pepsa-order',
     name: 'Pepsa Order',
     description: 'Pepsa order and dispatch platform',
     adapterType: 'pepsa-order',
-    productionStatus: 'DISABLED',
+    productionStatus: orderPaymentEnvStatus,
   });
   const paymentPlatform = await upsertPlatformWithEnvironments({
     key: 'pepsa-payment',
     name: 'Pepsa Payment',
     description: 'Pepsa payment platform',
     adapterType: 'pepsa-payment',
-    productionStatus: 'DISABLED',
+    productionStatus: orderPaymentEnvStatus,
   });
 
   const globals = await Promise.all(
@@ -248,12 +258,12 @@ async function main() {
     ]),
     operationsExclusions: ['bas.assets.legal-hold'],
   });
-  await seedPlatformAccess({
+  const orderAccess = await seedPlatformAccess({
     platformId: orderPlatform.id,
     platformKey: orderPlatform.key,
     permissions: orderPermissions,
   });
-  await seedPlatformAccess({
+  const paymentAccess = await seedPlatformAccess({
     platformId: paymentPlatform.id,
     platformKey: paymentPlatform.key,
     permissions: paymentPermissions,
@@ -366,23 +376,30 @@ async function main() {
       },
       update: {},
     });
-    // BAS membership only — order/payment membership is granted explicitly.
-    await db.platformMembership.upsert({
-      where: { adminUserId_platformId: { adminUserId: admin.id, platformId: basPlatform.id } },
-      create: { adminUserId: admin.id, platformId: basPlatform.id },
-      update: { status: 'ACTIVE' },
-    });
-    await db.roleAssignment.upsert({
-      where: { id: `bootstrap-bas-${admin.id}` },
-      create: {
-        id: `bootstrap-bas-${admin.id}`,
-        adminUserId: admin.id,
-        roleId: basAccess.operationsRole.id,
-        platformId: basPlatform.id,
-        grantedBy: admin.id,
-      },
-      update: {},
-    });
+    for (const access of [
+      { platform: basPlatform, roleId: basAccess.operationsRole.id, label: 'bas' },
+      { platform: orderPlatform, roleId: orderAccess.operationsRole.id, label: 'order' },
+      { platform: paymentPlatform, roleId: paymentAccess.operationsRole.id, label: 'payment' },
+    ]) {
+      await db.platformMembership.upsert({
+        where: {
+          adminUserId_platformId: { adminUserId: admin.id, platformId: access.platform.id },
+        },
+        create: { adminUserId: admin.id, platformId: access.platform.id },
+        update: { status: 'ACTIVE' },
+      });
+      await db.roleAssignment.upsert({
+        where: { id: `bootstrap-${access.label}-${admin.id}` },
+        create: {
+          id: `bootstrap-${access.label}-${admin.id}`,
+          adminUserId: admin.id,
+          roleId: access.roleId,
+          platformId: access.platform.id,
+          grantedBy: admin.id,
+        },
+        update: { roleId: access.roleId, platformId: access.platform.id, revokedAt: null },
+      });
+    }
     return admin;
   }
 

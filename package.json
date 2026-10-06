@@ -28,6 +28,7 @@
     "prisma:migrate": "prisma migrate deploy",
     "prisma:dev": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
+    "access:grant-order-payment": "node scripts/grant-order-payment-access.mjs",
     "verify": "pnpm prisma:generate && pnpm contract:check && pnpm typecheck && pnpm test && pnpm lint && pnpm build"
   },
   "dependencies": {

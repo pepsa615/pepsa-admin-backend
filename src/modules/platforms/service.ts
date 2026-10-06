@@ -24,7 +24,7 @@ export class PlatformService {
               },
             },
           },
-      include: { environments: { where: { status: 'ACTIVE' }, orderBy: { name: 'asc' } } },
+      include: { environments: { orderBy: [{ key: 'asc' }, { name: 'asc' }] } },
       orderBy: { name: 'asc' },
     });
     return rows.map(({ configurationReference: _secretReference, ...platform }) => platform);
@@ -190,6 +190,48 @@ export class PlatformService {
       outcome: 'SUCCESS',
       reason: input.reason,
       requestId: input.requestId,
+    });
+    return environment;
+  }
+
+  async setEnvironmentStatus(input: {
+    platformId: string;
+    environmentKey: string;
+    status: 'ACTIVE' | 'DEGRADED' | 'DISABLED';
+    actorId: string;
+    reason: string;
+    requestId: string;
+  }) {
+    const platform = assertFound(
+      await this.db.platform.findUnique({ where: { id: input.platformId } }),
+      'Platform not found',
+    );
+    const current = assertFound(
+      await this.db.platformEnvironment.findUnique({
+        where: {
+          platformId_key: { platformId: platform.id, key: input.environmentKey },
+        },
+      }),
+      'Platform environment not found',
+    );
+    const environment = await this.db.platformEnvironment.update({
+      where: { id: current.id },
+      data: { status: input.status },
+    });
+    await this.audit.record({
+      actorId: input.actorId,
+      platformId: platform.id,
+      action: 'platform.environment.status_changed',
+      targetType: 'PlatformEnvironment',
+      targetId: environment.id,
+      outcome: 'SUCCESS',
+      reason: input.reason,
+      requestId: input.requestId,
+      metadata: {
+        key: environment.key,
+        previousStatus: current.status,
+        status: environment.status,
+      },
     });
     return environment;
   }

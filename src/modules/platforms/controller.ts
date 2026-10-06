@@ -39,6 +39,10 @@ const environmentSchema = z.object({
   endpointReference: secretReference,
   reason,
 });
+const environmentStatusSchema = z.object({
+  status: z.enum(['ACTIVE', 'DEGRADED', 'DISABLED']),
+  reason,
+});
 
 export class PlatformController {
   constructor(private readonly service: PlatformService) {}
@@ -76,6 +80,16 @@ export class PlatformController {
       data: await this.service.addEnvironment({
         ...environmentSchema.parse(request.body),
         platformId: String(request.params.id),
+        actorId: request.admin!.id,
+        requestId: response.locals.requestId,
+      }),
+    });
+  setEnvironmentStatus = async (request: Request, response: Response) =>
+    response.json({
+      data: await this.service.setEnvironmentStatus({
+        ...environmentStatusSchema.parse(request.body),
+        platformId: String(request.params.id),
+        environmentKey: String(request.params.environmentKey),
         actorId: request.admin!.id,
         requestId: response.locals.requestId,
       }),

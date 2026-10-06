@@ -28,6 +28,13 @@ export const platformRoutes = (controller: PlatformController, auth: Authorizati
     auth.requirePermission('admin.platforms.manage'),
     asyncHandler(controller.addEnvironment),
   );
+  router.patch(
+    '/:id/environments/:environmentKey',
+    auth.requireCsrf,
+    auth.requireStepUp,
+    auth.requirePermission('admin.platforms.manage'),
+    asyncHandler(controller.setEnvironmentStatus),
+  );
   router.post(
     '/:id/credentials/rotate',
     auth.requireCsrf,
