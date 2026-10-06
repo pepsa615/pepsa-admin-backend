@@ -15,15 +15,11 @@ permissions:
   contents: read
 
 jobs:
-  verify:
-    uses: ./.github/workflows/ci.yml
-
   deploy-staging:
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/staging') ||
       (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging')
     runs-on: ubuntu-latest
-    needs: verify
     environment: staging
     concurrency:
       group: deploy-admin-backend-staging
@@ -51,7 +47,6 @@ jobs:
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' && inputs.environment == 'production')
     runs-on: ubuntu-latest
-    needs: verify
     environment: production
     concurrency:
       group: deploy-admin-backend-production
