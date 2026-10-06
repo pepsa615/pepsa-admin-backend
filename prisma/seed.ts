@@ -351,11 +351,7 @@ async function main() {
   const email2 = process.env.BOOTSTRAP_ADMIN2_EMAIL?.toLowerCase();
   const password2 = process.env.BOOTSTRAP_ADMIN2_PASSWORD;
 
-  async function upsertBootstrapAdmin(input: {
-    email: string;
-    password: string;
-    name: string;
-  }) {
+  async function upsertBootstrapAdmin(input: { email: string; password: string; name: string }) {
     const admin = await db.adminUser.upsert({
       where: { email: input.email },
       create: {

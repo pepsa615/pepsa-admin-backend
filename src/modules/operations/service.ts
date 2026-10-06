@@ -336,9 +336,7 @@ export class OperationService {
       const errorCode = error instanceof AppError ? error.code : 'PLATFORM_ERROR';
       const failureSummary = {
         message:
-          error instanceof AppError
-            ? error.message
-            : 'The platform operation failed unexpectedly',
+          error instanceof AppError ? error.message : 'The platform operation failed unexpectedly',
         ...(error instanceof AppError && error.details !== undefined
           ? { details: error.details as Prisma.InputJsonValue }
           : {}),

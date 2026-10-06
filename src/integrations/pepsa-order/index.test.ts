@@ -29,6 +29,11 @@ describe('PepsaOrderAdapter', () => {
       permission: 'order.catalog.read',
       risk: 'low',
     });
+    expect(capabilities.operations.find((op) => op.key === 'partners-list')).toMatchObject({
+      method: 'GET',
+      permission: 'order.partners.read',
+      risk: 'low',
+    });
     expect(
       capabilities.operations.find((op) => op.key === 'processing-run-optimize'),
     ).toMatchObject({
@@ -82,7 +87,10 @@ describe('PepsaOrderAdapter', () => {
     expect(headers['x-request-id']).toBe('req-catalog');
     expect(headers.authorization).toMatch(/^Bearer [^.]+\.[^.]+\.[^.]+$/);
     const payload = JSON.parse(
-      Buffer.from(headers.authorization!.replace(/^Bearer /, '').split('.')[1]!, 'base64url').toString(),
+      Buffer.from(
+        headers.authorization!.replace(/^Bearer /, '').split('.')[1]!,
+        'base64url',
+      ).toString(),
     ) as {
       aud?: string;
       platform?: string;
@@ -101,7 +109,9 @@ describe('PepsaOrderAdapter', () => {
   it('propagates mutation attribution headers for partner create', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ data: { id: 'partner-1' } }), { status: 200 }));
+      .mockResolvedValue(
+        new Response(JSON.stringify({ data: { id: 'partner-1' } }), { status: 200 }),
+      );
     vi.stubGlobal('fetch', fetchMock);
     const adapter = createAdapter();
     await expect(

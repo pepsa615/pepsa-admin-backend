@@ -14,9 +14,9 @@ const catalogue = readFileSync(join(root, 'docs/permissions/catalogue.md'), 'utf
 const seedKeys = [
   ...seed.matchAll(/\['((?:order|payment)\.[^']+)',\s*'(LOW|MEDIUM|HIGH|CRITICAL)'/g),
 ].map((match) => match[1]);
-const catalogueKeys = [
-  ...catalogue.matchAll(/`((?:order|payment)\.[a-z0-9.]+)`/g),
-].map((match) => match[1]);
+const catalogueKeys = [...catalogue.matchAll(/`((?:order|payment)\.[a-z0-9.]+)`/g)].map(
+  (match) => match[1],
+);
 
 const unique = (values) => [...new Set(values)].sort();
 const fromSeed = unique(seedKeys);
@@ -36,6 +36,4 @@ if (missingInCatalogue.length || missingInSeed.length) {
   process.exit(1);
 }
 
-console.log(
-  `Permission catalogue OK (${fromSeed.length} order/payment keys aligned with seed).`,
-);
+console.log(`Permission catalogue OK (${fromSeed.length} order/payment keys aligned with seed).`);

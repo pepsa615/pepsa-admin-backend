@@ -39,6 +39,26 @@ type RouteDefinition = {
 
 const ROUTES: readonly RouteDefinition[] = Object.freeze([
   {
+    key: 'partners-list',
+    adminMethod: 'GET',
+    destinationMethod: 'GET',
+    path: '/internal/v1/partners',
+    permission: 'order.partners.read',
+    risk: 'low',
+    mutation: false,
+    retryable: true,
+  },
+  {
+    key: 'partners-get',
+    adminMethod: 'GET',
+    destinationMethod: 'GET',
+    path: '/internal/v1/partners/{partnerId}',
+    permission: 'order.partners.read',
+    risk: 'low',
+    mutation: false,
+    retryable: true,
+  },
+  {
     key: 'partners-create',
     adminMethod: 'POST',
     destinationMethod: 'POST',
@@ -424,7 +444,8 @@ function collectParams(
     const fromQuery = query?.get(key);
     const fromPayload = payload?.[key];
     const value =
-      fromQuery ?? (typeof fromPayload === 'string' || typeof fromPayload === 'number'
+      fromQuery ??
+      (typeof fromPayload === 'string' || typeof fromPayload === 'number'
         ? String(fromPayload)
         : undefined);
     if (value) params[key] = value;
@@ -436,11 +457,7 @@ function resolvePath(template: string, params: Record<string, string>) {
   return template.replace(/\{([a-zA-Z]+)\}/g, (_match, key: string) => {
     const value = params[key];
     if (!value)
-      throw new AppError(
-        422,
-        'OPERATION_PATH_PARAM_REQUIRED',
-        `Missing path parameter ${key}`,
-      );
+      throw new AppError(422, 'OPERATION_PATH_PARAM_REQUIRED', `Missing path parameter ${key}`);
     return encodeURIComponent(value);
   });
 }
@@ -470,7 +487,10 @@ function buildQueryString(
   if (!query?.size) return '';
   const forwarded = new URLSearchParams();
   for (const [key, value] of query.entries()) {
-    if (PATH_PARAM_KEYS.includes(key as (typeof PATH_PARAM_KEYS)[number]) && route.path.includes(`{${key}}`))
+    if (
+      PATH_PARAM_KEYS.includes(key as (typeof PATH_PARAM_KEYS)[number]) &&
+      route.path.includes(`{${key}}`)
+    )
       continue;
     if (params[key] && route.path.includes(`{${key}}`)) continue;
     forwarded.append(key, value);
@@ -554,11 +574,7 @@ export class PepsaOrderAdapter implements PlatformAdapter {
   ): Promise<T> {
     const requestId = operation.actor.requestId ?? randomUUID();
     if (this.openUntil > Date.now())
-      throw new AppError(
-        503,
-        'PLATFORM_CIRCUIT_OPEN',
-        'Pepsa Order is temporarily unavailable',
-      );
+      throw new AppError(503, 'PLATFORM_CIRCUIT_OPEN', 'Pepsa Order is temporarily unavailable');
 
     const params = collectParams(operation.query, operation.payload);
     const path = `${resolvePath(route.path, params)}${buildQueryString(route, operation.query, params)}`;
@@ -586,9 +602,7 @@ export class PepsaOrderAdapter implements PlatformAdapter {
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
         const permissions =
-          operation.actor.permissions.length > 0
-            ? operation.actor.permissions
-            : [route.permission];
+          operation.actor.permissions.length > 0 ? operation.actor.permissions : [route.permission];
         const token = signActorContext(
           {
             iss: 'pepsa-admin',
@@ -651,11 +665,7 @@ export class PepsaOrderAdapter implements PlatformAdapter {
     this.openUntil = 0;
     if (route.key === 'metrics-read') {
       if (!response.ok)
-        throw new AppError(
-          response.status,
-          'PLATFORM_ERROR',
-          'Pepsa Order metrics request failed',
-        );
+        throw new AppError(response.status, 'PLATFORM_ERROR', 'Pepsa Order metrics request failed');
       return (await response.text()) as T;
     }
 

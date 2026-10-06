@@ -24,13 +24,11 @@ describe('PepsaPaymentAdapter', () => {
     expect(capabilities.operations.map((op) => op.key)).toEqual(
       pepsaPaymentRouteCatalogue.map((route) => route.key),
     );
-    expect(capabilities.operations.find((op) => op.key === 'transfer-settings-get')).toMatchObject(
-      {
-        method: 'GET',
-        permission: 'payment.settings.transfer',
-        risk: 'low',
-      },
-    );
+    expect(capabilities.operations.find((op) => op.key === 'transfer-settings-get')).toMatchObject({
+      method: 'GET',
+      permission: 'payment.settings.transfer',
+      risk: 'low',
+    });
     expect(capabilities.operations.find((op) => op.key === 'platforms-rotate-key')).toMatchObject({
       method: 'POST',
       permission: 'payment.platforms.keys.rotate',
@@ -41,7 +39,12 @@ describe('PepsaPaymentAdapter', () => {
       permission: 'payment.platforms.status',
       risk: 'critical',
     });
-    expect(capabilities.operations).toHaveLength(14);
+    expect(capabilities.operations.find((op) => op.key === 'platforms-list')).toMatchObject({
+      method: 'GET',
+      permission: 'payment.platforms.read',
+      risk: 'low',
+    });
+    expect(capabilities.operations).toHaveLength(16);
   });
 
   it('probes SVA provisioning list for platform availability', async () => {

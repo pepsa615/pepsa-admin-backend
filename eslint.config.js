@@ -8,8 +8,23 @@ export default [
   prettier,
   { ignores: ['dist/**', 'coverage/**'] },
   {
-    files: ['scripts/**/*.mjs'],
-    languageOptions: { globals: { URL: 'readonly', console: 'readonly' } },
+    files: ['scripts/**/*.mjs', 'ecosystem.config.cjs'],
+    languageOptions: {
+      globals: {
+        URL: 'readonly',
+        URLSearchParams: 'readonly',
+        console: 'readonly',
+        process: 'readonly',
+        Buffer: 'readonly',
+        fetch: 'readonly',
+        AbortSignal: 'readonly',
+        setTimeout: 'readonly',
+        module: 'readonly',
+        exports: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly',
+      },
+    },
   },
   {
     rules: {

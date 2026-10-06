@@ -29,6 +29,26 @@ type RouteDefinition = {
 
 const ROUTES: readonly RouteDefinition[] = Object.freeze([
   {
+    key: 'platforms-list',
+    adminMethod: 'GET',
+    destinationMethod: 'GET',
+    path: '/v1/platforms',
+    permission: 'payment.platforms.read',
+    risk: 'low',
+    mutation: false,
+    retryable: true,
+  },
+  {
+    key: 'platforms-get',
+    adminMethod: 'GET',
+    destinationMethod: 'GET',
+    path: '/v1/platforms/{platformId}',
+    permission: 'payment.platforms.read',
+    risk: 'low',
+    mutation: false,
+    retryable: true,
+  },
+  {
     key: 'platforms-onboard',
     adminMethod: 'POST',
     destinationMethod: 'POST',
@@ -206,11 +226,7 @@ function resolvePath(template: string, params: Record<string, string>) {
   return template.replace(/\{([a-zA-Z]+)\}/g, (_match, key: string) => {
     const value = params[key];
     if (!value)
-      throw new AppError(
-        422,
-        'OPERATION_PATH_PARAM_REQUIRED',
-        `Missing path parameter ${key}`,
-      );
+      throw new AppError(422, 'OPERATION_PATH_PARAM_REQUIRED', `Missing path parameter ${key}`);
     return encodeURIComponent(value);
   });
 }
@@ -231,18 +247,10 @@ function buildBody(
     if (route.path.includes(`{${key}}`)) delete body[key];
   }
   // Destination SVA reconcile requires note (5–500); map control-plane reason when omitted.
-  if (
-    route.key === 'sva-provisioning-reconcile' &&
-    typeof body.note !== 'string' &&
-    reason
-  ) {
+  if (route.key === 'sva-provisioning-reconcile' && typeof body.note !== 'string' && reason) {
     body.note = reason;
   }
-  if (
-    route.key === 'checkout-provisioning-reconcile' &&
-    typeof body.note !== 'string' &&
-    reason
-  ) {
+  if (route.key === 'checkout-provisioning-reconcile' && typeof body.note !== 'string' && reason) {
     body.note = reason;
   }
   return Object.keys(body).length ? JSON.stringify(body) : undefined;
@@ -288,16 +296,19 @@ export class PepsaPaymentAdapter implements PlatformAdapter {
   async checkHealth(platformId: string): Promise<PlatformHealth> {
     const checkedAt = new Date().toISOString();
     try {
-      await this.request(ROUTES.find((route) => route.key === 'sva-provisioning-list')!, {
-        operation: 'sva-provisioning-list',
-        method: 'GET',
-        actor: {
-          actorId: 'system',
-          platformId,
-          permissions: ['payment.sva.provisioning.read'],
-          requestId: randomUUID(),
+      await this.request(
+        ROUTES.find((route) => route.key === 'sva-provisioning-list')!,
+        {
+          operation: 'sva-provisioning-list',
+          method: 'GET',
+          actor: {
+            actorId: 'system',
+            platformId,
+            permissions: ['payment.sva.provisioning.read'],
+            requestId: randomUUID(),
+          },
         },
-      });
+      );
       return { status: 'available', checkedAt };
     } catch {
       return { status: 'unavailable', checkedAt };
@@ -344,11 +355,7 @@ export class PepsaPaymentAdapter implements PlatformAdapter {
   ): Promise<T> {
     const requestId = operation.actor.requestId ?? randomUUID();
     if (this.openUntil > Date.now())
-      throw new AppError(
-        503,
-        'PLATFORM_CIRCUIT_OPEN',
-        'Pepsa Payment is temporarily unavailable',
-      );
+      throw new AppError(503, 'PLATFORM_CIRCUIT_OPEN', 'Pepsa Payment is temporarily unavailable');
 
     const params = collectParams(operation.query, operation.payload);
     const path = `${resolvePath(route.path, params)}${buildQueryString(route, operation.query, params)}`;
@@ -376,9 +383,7 @@ export class PepsaPaymentAdapter implements PlatformAdapter {
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
         const permissions =
-          operation.actor.permissions.length > 0
-            ? operation.actor.permissions
-            : [route.permission];
+          operation.actor.permissions.length > 0 ? operation.actor.permissions : [route.permission];
         const token = signActorContext(
           {
             iss: 'pepsa-admin',
