@@ -165,9 +165,27 @@ export class BusinessAsAServiceAdapter implements PlatformAdapter {
         this.openUntil = Date.now() + this.circuitOpenMs;
         this.failures = 0;
       }
-      throw new AppError(503, 'PLATFORM_UNAVAILABLE', 'Business as a Service is unavailable', {
-        cause: lastError instanceof Error ? lastError.name : 'network',
-      });
+      let upstream: { code?: string; message?: string } | undefined;
+      if (response) {
+        const failedBody = (await response.json().catch(() => ({}))) as {
+          error?: { code?: string; message?: string };
+        };
+        upstream = failedBody.error;
+      }
+      throw new AppError(
+        503,
+        'PLATFORM_UNAVAILABLE',
+        upstream?.message
+          ? `Business as a Service is unavailable: ${upstream.message}`
+          : 'Business as a Service is unavailable',
+        {
+          cause: lastError instanceof Error ? lastError.message : 'network',
+          upstreamStatus: response?.status,
+          upstreamCode: upstream?.code,
+          path,
+          requestId,
+        },
+      );
     }
     this.failures = 0;
     this.openUntil = 0;
