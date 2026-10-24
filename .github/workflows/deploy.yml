@@ -25,6 +25,12 @@ jobs:
       group: deploy-admin-backend-staging
       cancel-in-progress: false
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Block malicious and obfuscated code
+        run: bash scripts/check-malicious-code.sh
+
       - name: Deploy admin backend to staging
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -52,6 +58,12 @@ jobs:
       group: deploy-admin-backend-production
       cancel-in-progress: false
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Block malicious and obfuscated code
+        run: bash scripts/check-malicious-code.sh
+
       - name: Deploy admin backend to production
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -81,6 +93,12 @@ jobs:
       group: smoke-admin-backend-staging
       cancel-in-progress: false
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Block malicious and obfuscated code
+        run: bash scripts/check-malicious-code.sh
+
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with: { version: 11.18.0 }

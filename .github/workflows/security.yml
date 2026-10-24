@@ -1,0 +1,20 @@
+name: Security
+
+permissions:
+  contents: read
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  malware:
+    name: Malicious code check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Block malicious code patterns
+        run: bash scripts/check-malicious-code.sh
