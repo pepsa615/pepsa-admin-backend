@@ -11,6 +11,8 @@ export interface ActorContext {
   environmentId?: string;
   environment?: string;
   resourceScopes?: Array<Record<string, unknown>>;
+  mfaVerified?: boolean;
+  approvalId?: string;
 }
 
 export interface PlatformCapabilities {

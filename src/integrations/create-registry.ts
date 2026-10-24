@@ -2,6 +2,7 @@ import type { AppConfig } from '../core/config.js';
 import { BusinessAsAServiceAdapter } from './business-as-a-service/index.js';
 import { PepsaOrderAdapter } from './pepsa-order/index.js';
 import { PepsaPaymentAdapter } from './pepsa-payment/index.js';
+import { VendorAdapter } from './vendor/index.js';
 import { PlatformAdapterRegistry } from './registry.js';
 
 export function createAdapterRegistry(config: AppConfig) {
@@ -37,6 +38,17 @@ export function createAdapterRegistry(config: AppConfig) {
       config.paymentService.retryAttempts,
       config.paymentService.circuitFailureThreshold,
       config.paymentService.circuitOpenMs,
+    ),
+  );
+  adapters.register(
+    new VendorAdapter(
+      config.vendorService.baseUrl,
+      config.vendorService.timeoutMs,
+      config.vendorService.audience,
+      config.actorSigningSecret,
+      config.vendorService.retryAttempts,
+      config.vendorService.circuitFailureThreshold,
+      config.vendorService.circuitOpenMs,
     ),
   );
   return adapters;

@@ -122,6 +122,7 @@ export class OperationService {
             requestId: input.requestId,
             permission: capability.permission,
             environmentId: input.environmentId,
+            approvalId: input.approvalId,
             resourceScopes: resourceScopes as Prisma.InputJsonValue | undefined,
             ...(capability.async ? {} : { startedAt: new Date() }),
           },
@@ -157,6 +158,8 @@ export class OperationService {
           environmentId: input.environmentId,
           environment: input.environment,
           resourceScopes,
+          mfaVerified: input.method === 'POST',
+          approvalId: input.approvalId,
         },
         idempotencyKey: input.idempotencyKey,
         payload:
@@ -291,6 +294,8 @@ export class OperationService {
           resourceScopes: Array.isArray(pending.resourceScopes)
             ? (pending.resourceScopes as Array<Record<string, unknown>>)
             : undefined,
+          mfaVerified: true,
+          approvalId: pending.approvalId ?? undefined,
         },
         idempotencyKey: pending.idempotencyKey,
         payload: {

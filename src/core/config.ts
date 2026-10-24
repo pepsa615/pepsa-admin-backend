@@ -26,6 +26,8 @@ const environmentSchema = z.object({
   ORDER_SERVICE_AUDIENCE: z.string().min(1).default('pepsa-order'),
   PAYMENT_SERVICE_BASE_URL: z.string().url().default('http://localhost:3400'),
   PAYMENT_SERVICE_AUDIENCE: z.string().min(1).default('pepsa-payment'),
+  VENDOR_SERVICE_BASE_URL: z.string().url().default('http://localhost:3500'),
+  VENDOR_SERVICE_AUDIENCE: z.string().min(1).default('pepsa-vendor-admin'),
   PLATFORM_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().max(30_000).default(5_000),
   PLATFORM_RETRY_ATTEMPTS: z.coerce.number().int().min(0).max(5).default(2),
   PLATFORM_CIRCUIT_FAILURE_THRESHOLD: z.coerce.number().int().min(2).max(20).default(5),
@@ -103,6 +105,14 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env) {
     paymentService: {
       baseUrl: parsed.PAYMENT_SERVICE_BASE_URL,
       audience: parsed.PAYMENT_SERVICE_AUDIENCE,
+      timeoutMs: parsed.PLATFORM_REQUEST_TIMEOUT_MS,
+      retryAttempts: parsed.PLATFORM_RETRY_ATTEMPTS,
+      circuitFailureThreshold: parsed.PLATFORM_CIRCUIT_FAILURE_THRESHOLD,
+      circuitOpenMs: parsed.PLATFORM_CIRCUIT_OPEN_MS,
+    },
+    vendorService: {
+      baseUrl: parsed.VENDOR_SERVICE_BASE_URL,
+      audience: parsed.VENDOR_SERVICE_AUDIENCE,
       timeoutMs: parsed.PLATFORM_REQUEST_TIMEOUT_MS,
       retryAttempts: parsed.PLATFORM_RETRY_ATTEMPTS,
       circuitFailureThreshold: parsed.PLATFORM_CIRCUIT_FAILURE_THRESHOLD,

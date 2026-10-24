@@ -79,6 +79,22 @@ const paymentPermissions: Array<[string, RiskLevel, boolean]> = [
   ['payment.checkout.provisioning.reconcile', 'CRITICAL', false],
   ['payment.kyc.encryption.rotate', 'CRITICAL', false],
 ];
+const vendorPermissions: Array<[string, RiskLevel, boolean]> = [
+  ['vendor.dashboard.read', 'LOW', true],
+  ['vendor.businesses.read', 'MEDIUM', true],
+  ['vendor.businesses.review', 'HIGH', true],
+  ['vendor.businesses.status', 'CRITICAL', false],
+  ['vendor.dispatchers.review', 'HIGH', true],
+  ['vendor.operations.read', 'MEDIUM', true],
+  ['vendor.performance.read', 'MEDIUM', true],
+  ['vendor.finance.read', 'HIGH', true],
+  ['vendor.fees.read', 'MEDIUM', true],
+  ['vendor.fees.manage', 'CRITICAL', false],
+  ['vendor.integrations.payment.read', 'MEDIUM', true],
+  ['vendor.integrations.payment.manage', 'CRITICAL', false],
+  ['vendor.exceptions.operate', 'HIGH', false],
+  ['vendor.audit.read', 'MEDIUM', true],
+];
 
 async function upsertPlatformWithEnvironments(input: {
   key: string;
@@ -237,6 +253,13 @@ async function main() {
     adapterType: 'pepsa-payment',
     productionStatus: orderPaymentEnvStatus,
   });
+  const vendorPlatform = await upsertPlatformWithEnvironments({
+    key: 'vendor',
+    name: 'Vendor',
+    description: 'Pepsa vendor operations platform',
+    adapterType: 'vendor',
+    productionStatus: orderPaymentEnvStatus,
+  });
 
   const globals = await Promise.all(
     globalPermissions.map(([key, riskLevel, delegatable]) =>
@@ -267,6 +290,11 @@ async function main() {
     platformId: paymentPlatform.id,
     platformKey: paymentPlatform.key,
     permissions: paymentPermissions,
+  });
+  const vendorAccess = await seedPlatformAccess({
+    platformId: vendorPlatform.id,
+    platformKey: vendorPlatform.key,
+    permissions: vendorPermissions,
   });
 
   const superRole = await db.role.upsert({
@@ -376,6 +404,7 @@ async function main() {
       { platform: basPlatform, roleId: basAccess.operationsRole.id, label: 'bas' },
       { platform: orderPlatform, roleId: orderAccess.operationsRole.id, label: 'order' },
       { platform: paymentPlatform, roleId: paymentAccess.operationsRole.id, label: 'payment' },
+      { platform: vendorPlatform, roleId: vendorAccess.operationsRole.id, label: 'vendor' },
     ]) {
       await db.platformMembership.upsert({
         where: {

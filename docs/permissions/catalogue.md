@@ -58,3 +58,26 @@ Finalized in Phase 0. Seeded in Phase 1. Capability mapping: [`docs/integrations
 | `payment.kyc.encryption.rotate`           | CRITICAL | no          |
 
 Settings keys cover both GET and PATCH; gate writes via role composition until finer `.read` / `.write` splits are needed.
+
+## Vendor (`vendor`)
+
+The Vendor destination re-authorizes every key using audience `pepsa-vendor-admin`. Vendor scopes may contain `vendorIds`; an empty supplied scope is deny-all. Sensitive documents require both the relevant review permission and a destination audit event.
+
+| Permission                           | Risk     | Delegatable | Additional control             |
+| ------------------------------------ | -------- | ----------- | ------------------------------ |
+| `vendor.dashboard.read`              | LOW      | yes         | —                              |
+| `vendor.businesses.read`             | MEDIUM   | yes         | PII allow-list                 |
+| `vendor.businesses.review`           | HIGH     | yes         | reason + idempotency           |
+| `vendor.businesses.status`           | CRITICAL | no          | MFA + dual approval            |
+| `vendor.dispatchers.review`          | HIGH     | yes         | reason + idempotency           |
+| `vendor.operations.read`             | MEDIUM   | yes         | vendor scope                   |
+| `vendor.performance.read`            | MEDIUM   | yes         | vendor scope                   |
+| `vendor.finance.read`                | HIGH     | yes         | authoritative/projected labels |
+| `vendor.fees.read`                   | MEDIUM   | yes         | —                              |
+| `vendor.fees.manage`                 | CRITICAL | no          | MFA + dual approval            |
+| `vendor.integrations.payment.read`   | MEDIUM   | yes         | opaque Payment IDs only        |
+| `vendor.integrations.payment.manage` | CRITICAL | no          | MFA + dual approval            |
+| `vendor.exceptions.operate`          | HIGH     | no          | reason + idempotency           |
+| `vendor.audit.read`                  | MEDIUM   | yes         | bounded range/export           |
+
+Session revocation, provisioning retry/reconciliation, event replay, exception resolution and fee activation are mutations. They require a reason and idempotency key even when the table risk is below CRITICAL.
