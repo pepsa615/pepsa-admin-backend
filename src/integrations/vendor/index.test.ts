@@ -22,7 +22,7 @@ describe('VendorAdapter contract', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it('keeps a complete explicit operation policy catalogue', () => {
-    expect(vendorRouteCatalogue).toHaveLength(29);
+    expect(vendorRouteCatalogue).toHaveLength(34);
     expect(vendorRouteCatalogue.find(({ key }) => key === 'vendor-suspend')).toMatchObject({
       method: 'POST',
       permission: 'vendor.businesses.status',
