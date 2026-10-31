@@ -38,6 +38,8 @@ export const vendorRouteCatalogue: readonly VendorRoute[] = Object.freeze(
     ['dispatcher-review-detail', 'GET', 'vendor.dispatchers.review', 'high'],
     ['dispatcher-review-document', 'GET', 'vendor.dispatchers.review', 'high'],
     ['dispatcher-review', 'POST', 'vendor.dispatchers.review', 'high'],
+    ['rider-provisioning-list', 'GET', 'vendor.dispatchers.review', 'high'],
+    ['rider-provisioning-retry', 'POST', 'vendor.dispatchers.review', 'high'],
     ['provisioning-list', 'GET', 'vendor.integrations.payment.read', 'medium'],
     ['fee-policies-list', 'GET', 'vendor.fees.read', 'medium'],
     ['fee-policy-simulate', 'POST', 'vendor.fees.read', 'medium'],
