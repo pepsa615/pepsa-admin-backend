@@ -90,3 +90,5 @@ Session revocation, provisioning retry/reconciliation, event replay, exception r
 | `rider.provisioning.manage`      | CRITICAL | no          | MFA + dual approval |
 | `rider.insurance.read`           | HIGH     | yes         | PII allow-list      |
 | `rider.insurance.manage`         | CRITICAL | no          | MFA + dual approval |
+| `rider.onboarding.read`          | MEDIUM   | yes         | none                |
+| `rider.onboarding.manage`        | HIGH     | yes         | reason              |

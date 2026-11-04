@@ -100,6 +100,8 @@ const riderPermissions: Array<[string, RiskLevel, boolean]> = [
   ['rider.provisioning.manage', 'CRITICAL', false],
   ['rider.insurance.read', 'HIGH', true],
   ['rider.insurance.manage', 'CRITICAL', false],
+  ['rider.onboarding.read', 'MEDIUM', true],
+  ['rider.onboarding.manage', 'HIGH', true],
 ];
 
 async function upsertPlatformWithEnvironments(input: {

@@ -19,6 +19,9 @@ const routes: readonly Route[] = [
   { key: 'wallet-provisioning-reconcile', method: 'POST', path: '/v1/internal/wallet-provisioning/{jobId}/reconcile', permission: 'rider.provisioning.manage', risk: 'critical' },
   { key: 'insurance-claims-list', method: 'GET', path: '/v1/internal/insurance/claims', permission: 'rider.insurance.read', risk: 'high' },
   { key: 'insurance-claim-review', method: 'POST', path: '/v1/internal/insurance/claims/{claimId}/review', permission: 'rider.insurance.manage', risk: 'critical' },
+  { key: 'onboarding-documents-list', method: 'GET', path: '/v1/internal/onboarding/documents', permission: 'rider.onboarding.read', risk: 'medium' },
+  { key: 'onboarding-document-get', method: 'GET', path: '/v1/internal/onboarding/documents/{documentKey}', permission: 'rider.onboarding.read', risk: 'medium' },
+  { key: 'onboarding-document-save', method: 'POST', path: '/v1/internal/onboarding/documents/{documentKey}', permission: 'rider.onboarding.manage', risk: 'high' },
 ];
 
 export class RiderAdapter implements PlatformAdapter {
@@ -62,9 +65,19 @@ export class RiderAdapter implements PlatformAdapter {
 
     const payload: Record<string, unknown> = { ...operation.payload, actorId: operation.actor.actorId };
     let path = route.path;
-    for (const key of ['jobId', 'claimId']) {
-      const value = payload[key];
-      if (typeof value === 'string') path = path.replace(`{${key}}`, encodeURIComponent(value));
+    for (const key of ['jobId', 'claimId', 'documentKey']) {
+      const fromPayload = payload[key];
+      const fromQuery = operation.query?.get(key);
+      const value =
+        typeof fromPayload === 'string' && fromPayload
+          ? fromPayload
+          : typeof fromQuery === 'string' && fromQuery
+            ? fromQuery
+            : undefined;
+      if (value) {
+        path = path.replace(`{${key}}`, encodeURIComponent(value));
+        operation.query?.delete(key);
+      }
     }
     if (path.includes('{')) throw new AppError(400, 'PATH_PARAMETER_REQUIRED', 'Rider resource identifier is required');
     const query = operation.query?.toString();
@@ -74,6 +87,8 @@ export class RiderAdapter implements PlatformAdapter {
         Authorization: `Bearer ${this.apiToken}`,
         'Content-Type': 'application/json',
         'X-Request-Id': operation.actor.requestId,
+        'X-Admin-Permissions': operation.actor.permissions.join(','),
+        'X-Admin-Actor-Id': operation.actor.actorId,
         ...(operation.idempotencyKey ? { 'Idempotency-Key': operation.idempotencyKey } : {}),
       },
       body: route.method === 'POST' ? JSON.stringify(payload) : undefined,
