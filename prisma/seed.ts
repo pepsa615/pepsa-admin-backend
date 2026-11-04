@@ -95,6 +95,12 @@ const vendorPermissions: Array<[string, RiskLevel, boolean]> = [
   ['vendor.exceptions.operate', 'HIGH', false],
   ['vendor.audit.read', 'MEDIUM', true],
 ];
+const riderPermissions: Array<[string, RiskLevel, boolean]> = [
+  ['rider.provisioning.read', 'HIGH', true],
+  ['rider.provisioning.manage', 'CRITICAL', false],
+  ['rider.insurance.read', 'HIGH', true],
+  ['rider.insurance.manage', 'CRITICAL', false],
+];
 
 async function upsertPlatformWithEnvironments(input: {
   key: string;
@@ -260,6 +266,13 @@ async function main() {
     adapterType: 'vendor',
     productionStatus: orderPaymentEnvStatus,
   });
+  const riderPlatform = await upsertPlatformWithEnvironments({
+    key: 'rider',
+    name: 'Rider',
+    description: 'Pepsa rider operations platform',
+    adapterType: 'rider',
+    productionStatus: orderPaymentEnvStatus,
+  });
 
   const globals = await Promise.all(
     globalPermissions.map(([key, riskLevel, delegatable]) =>
@@ -295,6 +308,11 @@ async function main() {
     platformId: vendorPlatform.id,
     platformKey: vendorPlatform.key,
     permissions: vendorPermissions,
+  });
+  const riderAccess = await seedPlatformAccess({
+    platformId: riderPlatform.id,
+    platformKey: riderPlatform.key,
+    permissions: riderPermissions,
   });
 
   const superRole = await db.role.upsert({
@@ -405,6 +423,7 @@ async function main() {
       { platform: orderPlatform, roleId: orderAccess.operationsRole.id, label: 'order' },
       { platform: paymentPlatform, roleId: paymentAccess.operationsRole.id, label: 'payment' },
       { platform: vendorPlatform, roleId: vendorAccess.operationsRole.id, label: 'vendor' },
+      { platform: riderPlatform, roleId: riderAccess.operationsRole.id, label: 'rider' },
     ]) {
       await db.platformMembership.upsert({
         where: {

@@ -28,6 +28,8 @@ const environmentSchema = z.object({
   PAYMENT_SERVICE_AUDIENCE: z.string().min(1).default('pepsa-payment'),
   VENDOR_SERVICE_BASE_URL: z.string().url().default('http://localhost:3500'),
   VENDOR_SERVICE_AUDIENCE: z.string().min(1).default('pepsa-vendor-admin'),
+  RIDER_SERVICE_BASE_URL: z.string().url().default('http://localhost:4000'),
+  RIDER_ADMIN_API_TOKEN: z.string().min(24).default('development-rider-admin-token'),
   PLATFORM_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().max(30_000).default(5_000),
   PLATFORM_RETRY_ATTEMPTS: z.coerce.number().int().min(0).max(5).default(2),
   PLATFORM_CIRCUIT_FAILURE_THRESHOLD: z.coerce.number().int().min(2).max(20).default(5),
@@ -117,6 +119,11 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env) {
       retryAttempts: parsed.PLATFORM_RETRY_ATTEMPTS,
       circuitFailureThreshold: parsed.PLATFORM_CIRCUIT_FAILURE_THRESHOLD,
       circuitOpenMs: parsed.PLATFORM_CIRCUIT_OPEN_MS,
+    },
+    riderService: {
+      baseUrl: parsed.RIDER_SERVICE_BASE_URL,
+      apiToken: parsed.RIDER_ADMIN_API_TOKEN,
+      timeoutMs: parsed.PLATFORM_REQUEST_TIMEOUT_MS,
     },
     email: {
       host: parsed.SMTP_HOST,

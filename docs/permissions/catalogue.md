@@ -81,3 +81,12 @@ The Vendor destination re-authorizes every key using audience `pepsa-vendor-admi
 | `vendor.audit.read`                  | MEDIUM   | yes         | bounded range/export           |
 
 Session revocation, provisioning retry/reconciliation, event replay, exception resolution and fee activation are mutations. They require a reason and idempotency key even when the table risk is below CRITICAL.
+
+## Rider (`rider`)
+
+| Permission                       | Risk     | Delegatable | Additional control  |
+| -------------------------------- | -------- | ----------- | ------------------- |
+| `rider.provisioning.read`        | HIGH     | yes         | PII allow-list      |
+| `rider.provisioning.manage`      | CRITICAL | no          | MFA + dual approval |
+| `rider.insurance.read`           | HIGH     | yes         | PII allow-list      |
+| `rider.insurance.manage`         | CRITICAL | no          | MFA + dual approval |
