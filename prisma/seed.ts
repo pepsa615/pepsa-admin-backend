@@ -78,6 +78,23 @@ const paymentPermissions: Array<[string, RiskLevel, boolean]> = [
   ['payment.checkout.provisioning.read', 'MEDIUM', true],
   ['payment.checkout.provisioning.reconcile', 'CRITICAL', false],
   ['payment.kyc.encryption.rotate', 'CRITICAL', false],
+  ['payment.finance.read', 'LOW', true],
+  ['payment.transactions.read', 'MEDIUM', true],
+  ['payment.transactions.pii', 'HIGH', false],
+  ['payment.ledger.read', 'HIGH', true],
+  ['payment.levies.read', 'MEDIUM', true],
+  ['payment.levies.manage', 'HIGH', false],
+  ['payment.levies.approve', 'CRITICAL', false],
+  ['payment.reconciliation.read', 'MEDIUM', true],
+  ['payment.reconciliation.prepare', 'HIGH', true],
+  ['payment.reconciliation.resolve', 'CRITICAL', false],
+  ['payment.settlements.read', 'HIGH', true],
+  ['payment.provider-events.read', 'MEDIUM', true],
+  ['payment.exports.create', 'HIGH', true],
+  ['payment.adjustments.request', 'HIGH', false],
+  ['payment.adjustments.approve', 'CRITICAL', false],
+  ['payment.remittances.prepare', 'HIGH', false],
+  ['payment.remittances.approve', 'CRITICAL', false],
 ];
 const vendorPermissions: Array<[string, RiskLevel, boolean]> = [
   ['vendor.dashboard.read', 'LOW', true],
@@ -306,6 +323,33 @@ async function main() {
     platformKey: paymentPlatform.key,
     permissions: paymentPermissions,
   });
+  const auditorExport = paymentAccess.platformPerms.find(({ key }) => key === 'payment.exports.create');
+  if (auditorExport) await db.rolePermission.upsert({
+    where: { roleId_permissionId: { roleId: paymentAccess.readonlyRole.id, permissionId: auditorExport.id } },
+    create: { roleId: paymentAccess.readonlyRole.id, permissionId: auditorExport.id }, update: {},
+  });
+  const financeRoleSpecs = [
+    {
+      key: 'payment-accountant', name: 'Payment Accountant',
+      permissions: ['payment.finance.read','payment.transactions.read','payment.ledger.read','payment.levies.read','payment.reconciliation.read','payment.reconciliation.prepare','payment.settlements.read','payment.provider-events.read','payment.exports.create','payment.adjustments.request','payment.remittances.prepare'],
+    },
+    {
+      key: 'finance-approver', name: 'Finance Approver',
+      permissions: ['payment.finance.read','payment.transactions.read','payment.transactions.pii','payment.ledger.read','payment.levies.read','payment.levies.manage','payment.levies.approve','payment.reconciliation.read','payment.reconciliation.resolve','payment.settlements.read','payment.provider-events.read','payment.exports.create','payment.adjustments.approve','payment.remittances.approve'],
+    },
+  ];
+  for (const spec of financeRoleSpecs) {
+    const role = await db.role.upsert({
+      where: { scope_key: { scope: paymentPlatform.key, key: spec.key } },
+      create: { scope: paymentPlatform.key, platformId: paymentPlatform.id, key: spec.key, name: spec.name, isSystemRole: true },
+      update: { name: spec.name },
+    });
+    const permissions = await db.permission.findMany({ where: { platformId: paymentPlatform.id, key: { in: spec.permissions } } });
+    await Promise.all(permissions.map((permission) => db.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId: role.id, permissionId: permission.id } },
+      create: { roleId: role.id, permissionId: permission.id }, update: {},
+    })));
+  }
   const vendorAccess = await seedPlatformAccess({
     platformId: vendorPlatform.id,
     platformKey: vendorPlatform.key,
