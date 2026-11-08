@@ -10,7 +10,7 @@ import { AppError } from '../../core/errors.js';
 import { logger } from '../../core/logger.js';
 
 const capabilitiesTtlMs = 30_000;
-const PATH_PARAM_KEYS = ['platformId', 'userId', 'checkoutId'] as const;
+const PATH_PARAM_KEYS = ['platformId', 'userId', 'checkoutId', 'transactionId', 'policyId'] as const;
 
 type DestinationMethod = 'GET' | 'POST' | 'PATCH';
 type Risk = PlatformCapabilities['operations'][number]['risk'];
@@ -187,6 +187,31 @@ const ROUTES: readonly RouteDefinition[] = Object.freeze([
     risk: 'critical',
     mutation: true,
     retryable: false,
+  },
+  ...([
+    ['finance-overview', '/v1/admin/finance/overview', 'payment.finance.read'],
+    ['finance-transactions', '/v1/admin/finance/transactions', 'payment.transactions.read'],
+    ['finance-transaction', '/v1/admin/finance/transactions/{transactionId}', 'payment.transactions.read'],
+    ['finance-journals', '/v1/admin/finance/journals', 'payment.ledger.read'],
+    ['finance-levies', '/v1/admin/finance/levies', 'payment.levies.read'],
+    ['finance-reconciliation', '/v1/admin/finance/reconciliation', 'payment.reconciliation.read'],
+    ['finance-settlements', '/v1/admin/finance/settlements', 'payment.settlements.read'],
+    ['finance-provider-events', '/v1/admin/finance/provider-events', 'payment.provider-events.read'],
+  ] as const).map(([key, path, permission]) => ({ key, adminMethod: 'GET' as const, destinationMethod: 'GET' as const, path, permission, risk: 'low' as const, mutation: false, retryable: true })),
+  {
+    key: 'finance-policy-create', adminMethod: 'POST', destinationMethod: 'POST',
+    path: '/v1/admin/finance/levies/policies', permission: 'payment.levies.manage',
+    risk: 'high', mutation: true, retryable: false,
+  },
+  {
+    key: 'finance-policy-approve', adminMethod: 'POST', destinationMethod: 'POST',
+    path: '/v1/admin/finance/levies/policies/{policyId}/approve', permission: 'payment.levies.approve',
+    risk: 'critical', mutation: true, retryable: false,
+  },
+  {
+    key: 'finance-export-create', adminMethod: 'POST', destinationMethod: 'POST',
+    path: '/v1/admin/finance/exports', permission: 'payment.exports.create',
+    risk: 'medium', mutation: true, retryable: false, async: true,
   },
 ]);
 

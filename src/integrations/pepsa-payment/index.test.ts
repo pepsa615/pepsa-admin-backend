@@ -44,7 +44,7 @@ describe('PepsaPaymentAdapter', () => {
       permission: 'payment.platforms.read',
       risk: 'low',
     });
-    expect(capabilities.operations).toHaveLength(16);
+    expect(capabilities.operations).toHaveLength(pepsaPaymentRouteCatalogue.length);
   });
 
   it('probes SVA provisioning list for platform availability', async () => {
